@@ -1,0 +1,621 @@
+// 404 Cyber House — billing & booking module
+// Scope: Zone/Device, Tariffs, Booking/Session, Guest+Balance, Loyalty,
+// Refunds, Payments/Fiscalization (stub providers — real Т-Банк integration
+// is a separate follow-up, see src/modules/payments and src/modules/fiscal).
+//
+// Out of scope here (owned by other modules, not yet built):
+// registration wizard, phone+password auth, door/intercom codes, guest CRUD UI.
+// Guest below is intentionally minimal — just enough to hang billing on.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Clubs / Zones / Devices
+// ---------------------------------------------------------------------------
+
+model Club {
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  timezone  String   @default("Europe/Samara")
+  createdAt DateTime @default(now())
+
+  zones          Zone[]
+  devices        Device[]
+  dayTypes       DayType[]
+  holidays       HolidayOverride[]
+  tariffGroups   TariffGroup[]
+  autoBonusRules AutoBonusRule[]
+}
+
+// "Типы ПК в клубах" — зоны. is_room объединяет несколько устройств под общий
+// тариф для аналитики/цены, но бронь и код всегда выдаются на конкретное
+// устройство (решение: один ПК — один код, даже внутри комнаты).
+model Zone {
+  id        String  @id @default(cuid())
+  clubId    String
+  club      Club    @relation(fields: [clubId], references: [id])
+  nameRu    String
+  nameEn    String?
+  color     String  @default("#f97316")
+  sortOrder Int     @default(0)
+  isRoom    Boolean @default(false)
+
+  devices     Device[]
+  tariffRules TariffRule[]
+  createdAt   DateTime     @default(now())
+
+  @@index([clubId])
+}
+
+enum DeviceKind {
+  PC
+  TV
+  TERMINAL
+  ADMIN_PC
+}
+
+enum DeviceStatus {
+  FREE
+  BUSY
+  CONNECTING
+  TECH_MODE
+  LOCKED
+  DISABLED
+}
+
+enum RelayType {
+  NONE
+  IR
+  IP_RELAY
+}
+
+model Device {
+  id           String       @id @default(cuid())
+  clubId       String
+  club         Club         @relation(fields: [clubId], references: [id])
+  zoneId       String
+  zone         Zone         @relation(fields: [zoneId], references: [id])
+  kind         DeviceKind   @default(PC)
+  name         String
+  cardNumber   Int
+  physicalName String?
+  mac          String?
+  ip           String?
+  hostname     String?
+  uuid         String?
+  relayType    RelayType    @default(NONE)
+  color        String?
+  status       DeviceStatus @default(FREE)
+  comment      String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  bookings Booking[]
+  sessions Session[]
+
+  @@unique([clubId, cardNumber])
+  @@index([zoneId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Day types / calendar
+// ---------------------------------------------------------------------------
+
+// Группа дней недели (обычно Будни/Выходные). weekdays: 0=Sunday..6=Saturday.
+model DayType {
+  id       String @id @default(cuid())
+  clubId   String
+  club     Club   @relation(fields: [clubId], references: [id])
+  name     String
+  color    String @default("#64748b")
+  weekdays Int[]
+
+  holidayOverrides HolidayOverride[]
+  tariffRules      TariffRule[]
+
+  @@index([clubId])
+}
+
+// Переопределение типа дня для конкретной даты (праздники).
+model HolidayOverride {
+  id        String   @id @default(cuid())
+  clubId    String
+  club      Club     @relation(fields: [clubId], references: [id])
+  date      DateTime @db.Date
+  dayTypeId String
+  dayType   DayType  @relation(fields: [dayTypeId], references: [id])
+
+  @@unique([clubId, date])
+}
+
+// ---------------------------------------------------------------------------
+// Tariffs
+// ---------------------------------------------------------------------------
+
+enum TariffType {
+  BASE
+  PACKAGE
+  SUBSCRIPTION
+}
+
+enum PackageMode {
+  FIXED_DURATION
+  FIXED_END
+}
+
+model TariffGroup {
+  id        String @id @default(cuid())
+  clubId    String
+  club      Club   @relation(fields: [clubId], references: [id])
+  name      String
+  sortOrder Int    @default(0)
+
+  tariffs Tariff[]
+
+  @@index([clubId])
+}
+
+model Tariff {
+  id      String      @id @default(cuid())
+  groupId String
+  group   TariffGroup @relation(fields: [groupId], references: [id])
+  type    TariffType
+  name    String
+
+  // BASE
+  isFullBalance Boolean @default(false) // "на весь баланс" — бронь через приложение недоступна
+
+  // PACKAGE
+  packageMode        PackageMode?
+  packageDurationMin Int? // фиксированная длительность в минутах
+  packageFixedEndMin Int? // фиксированное окончание, минут от полуночи (напр. 06:00 = 360)
+
+  // SUBSCRIPTION — фиксированная цена блока за весь абонемент (не по сетке,
+  // не привязана к дню/зоне/времени — используется много раз до истечения lifetime).
+  subscriptionDurationMin Int? // суммарное время абонемента, минут
+  subscriptionLifetimeHrs Int? // срок жизни абонемента, часов с момента покупки
+  subscriptionPrice       Decimal? @db.Decimal(12, 2)
+
+  allowOnlineBooking     Boolean @default(true) // false для "на весь баланс" и абонемента
+  mobileOnly             Boolean @default(false)
+  ignoreLoyaltyDiscounts Boolean @default(false)
+  allowCreditLine        Boolean @default(false)
+
+  bonusEarnPercent     Int     @default(0) // начисление бонусов, % от суммы
+  bonusSpendMaxPercent Int     @default(0) // максимум % оплаты бонусами
+  refundUnusedTime     Boolean @default(false)
+  minChargedMinutes    Int     @default(0) // минимум спишется всегда
+
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  rules              TariffRule[]
+  bookings           Booking[]
+  sessions           Session[]
+  guestSubscriptions GuestSubscription[]
+
+  @@index([groupId])
+}
+
+// Абонемент гостя — куплен один раз (subscriptionPrice), расходуется по частям
+// за несколько визитов до истечения lifetime. Нельзя использовать при онлайн-брони
+// (заполняется только через WALK_IN_LOGIN сессии).
+model GuestSubscription {
+  id               String   @id @default(cuid())
+  guestId          String
+  guest            Guest    @relation(fields: [guestId], references: [id])
+  tariffId         String
+  tariff           Tariff   @relation(fields: [tariffId], references: [id])
+  totalMinutes     Int
+  remainingMinutes Int
+  purchasedAt      DateTime @default(now())
+  expiresAt        DateTime
+
+  @@index([guestId])
+}
+
+// Правило тарифной сетки: (тип дня × время старта-конца × зона) → цена.
+// Тарифы через полночь обязательно разбиваются на два правила (до/после 00:00).
+model TariffRule {
+  id        String  @id @default(cuid())
+  tariffId  String
+  tariff    Tariff  @relation(fields: [tariffId], references: [id])
+  dayTypeId String
+  dayType   DayType @relation(fields: [dayTypeId], references: [id])
+  zoneId    String
+  zone      Zone    @relation(fields: [zoneId], references: [id])
+
+  startMinute Int // минут от полуночи, 0..1439
+  endMinute   Int // 1..1440 (1440 = до 00:00 следующего дня)
+
+  pricePerMinute Decimal @db.Decimal(10, 2)
+
+  displayStartMinute Int? // время отображения тарифа гостю может не совпадать
+  displayEndMinute   Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([tariffId])
+  @@index([zoneId, dayTypeId])
+}
+
+// ---------------------------------------------------------------------------
+// Guest (minimal — auth/registration wizard is a separate module)
+// ---------------------------------------------------------------------------
+
+model Guest {
+  id        String    @id @default(cuid())
+  phone     String    @unique
+  fullName  String?
+  email     String?
+  birthDate DateTime? @db.Date
+  createdAt DateTime  @default(now())
+
+  manualGroupId String?
+  manualGroup   GuestManualGroup? @relation(fields: [manualGroupId], references: [id])
+
+  bookings            Booking[]
+  sessions            Session[]
+  balanceLedgerItems  BalanceLedger[]
+  manualBalanceLogs   ManualBalanceLog[]
+  refundRequests      RefundRequest[]
+  paymentTransactions PaymentTransaction[]
+  loyaltyState        GuestLoyaltyState?
+  subscriptions       GuestSubscription[]
+
+  @@index([phone])
+}
+
+// ---------------------------------------------------------------------------
+// Booking / Session
+// ---------------------------------------------------------------------------
+
+enum BookingStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+// Бронирование конкретного устройства. Правила (проверяются в сервисе):
+// - минимальный лаг "сейчас → startAt" — 5 минут;
+// - минимум 60 минут между концом одной брони и началом следующей на этом устройстве;
+// - код действует строго до endAt, без грейс-периода;
+// - один ПК — один код (бронь и код всегда на конкретное устройство).
+model Booking {
+  id       String @id @default(cuid())
+  deviceId String
+  device   Device @relation(fields: [deviceId], references: [id])
+  guestId  String
+  guest    Guest  @relation(fields: [guestId], references: [id])
+  tariffId String
+  tariff   Tariff @relation(fields: [tariffId], references: [id])
+
+  code        String        @unique
+  startAt     DateTime
+  paidMinutes Int
+  endAt       DateTime
+  status      BookingStatus @default(SCHEDULED)
+  cancelledAt DateTime?
+  createdAt   DateTime      @default(now())
+
+  session Session?
+
+  @@index([deviceId, startAt])
+  @@index([guestId])
+  @@index([code])
+}
+
+enum SessionStatus {
+  PENDING_PAYMENT // вход без брони: 5 минут на выбор тарифа
+  ACTIVE
+  COMPLETED
+  EXPIRED // не оплатил за 5 минут — ПК уходит на автоматическую перезагрузку
+}
+
+enum SessionSource {
+  BOOKING
+  WALK_IN_LOGIN
+}
+
+// Фактическая сессия использования устройства — из брони, либо вход по
+// логину/паролю без брони (WALK_IN_LOGIN).
+model Session {
+  id        String   @id @default(cuid())
+  deviceId  String
+  device    Device   @relation(fields: [deviceId], references: [id])
+  guestId   String
+  guest     Guest    @relation(fields: [guestId], references: [id])
+  bookingId String?  @unique
+  booking   Booking? @relation(fields: [bookingId], references: [id])
+  tariffId  String?
+  tariff    Tariff?  @relation(fields: [tariffId], references: [id])
+
+  source      SessionSource
+  status      SessionStatus @default(PENDING_PAYMENT)
+  startedAt   DateTime      @default(now())
+  endsAt      DateTime
+  completedAt DateTime?
+
+  extensions SessionExtension[]
+
+  @@index([deviceId, status])
+  @@index([guestId])
+}
+
+// Лог продлений сессии — продление не сгорает при повторном вводе кода,
+// поэтому каждое продление — отдельная запись, endsAt на сессии всегда актуален.
+model SessionExtension {
+  id           String   @id @default(cuid())
+  sessionId    String
+  session      Session  @relation(fields: [sessionId], references: [id])
+  minutesAdded Int
+  previousEnd  DateTime
+  newEnd       DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([sessionId])
+}
+
+// ---------------------------------------------------------------------------
+// Balance / audit
+// ---------------------------------------------------------------------------
+
+enum BalanceKind {
+  MONEY
+  BONUS
+}
+
+enum BalanceSource {
+  TOPUP
+  SESSION_CHARGE
+  SUBSCRIPTION_PURCHASE
+  REFUND
+  MANUAL_ADJUST
+  LOYALTY_CASHBACK
+  BIRTHDAY_BONUS
+  AUTO_BONUS_REGISTRATION
+  AUTO_BONUS_TOPUP
+}
+
+enum BalanceReferenceType {
+  NONE
+  BOOKING
+  SESSION
+  REFUND
+  MANUAL_LOG
+  PAYMENT
+}
+
+// Баланс всегда меняется дельтой, никогда абсолютным значением — это
+// единственный источник истины по деньгам/бонусам гостя.
+model BalanceLedger {
+  id            String               @id @default(cuid())
+  guestId       String
+  guest         Guest                @relation(fields: [guestId], references: [id])
+  kind          BalanceKind
+  amountDelta   Decimal              @db.Decimal(12, 2)
+  balanceAfter  Decimal              @db.Decimal(12, 2)
+  source        BalanceSource
+  referenceType BalanceReferenceType @default(NONE)
+  referenceId   String?
+  createdAt     DateTime             @default(now())
+
+  manualLog ManualBalanceLog?
+
+  @@index([guestId, kind])
+  @@index([referenceType, referenceId])
+}
+
+enum ManualLogChannel {
+  ADMIN_CONSOLE
+  BONUS_CONSOLE
+  GUEST_BALANCE_PAGE
+  API
+}
+
+// Аудит именно РУЧНЫХ изменений баланса (не системных списаний за сессию/покупки).
+model ManualBalanceLog {
+  id            String           @id @default(cuid())
+  guestId       String
+  guest         Guest            @relation(fields: [guestId], references: [id])
+  ledgerEntryId String           @unique
+  ledgerEntry   BalanceLedger    @relation(fields: [ledgerEntryId], references: [id])
+  staffId       String?
+  sourceChannel ManualLogChannel
+  comment       String?
+  createdAt     DateTime         @default(now())
+
+  @@index([guestId])
+}
+
+// ---------------------------------------------------------------------------
+// Loyalty
+// ---------------------------------------------------------------------------
+
+enum RecalcPeriod {
+  M1
+  M2
+  M3
+  M4
+  M6
+  M12
+}
+
+// Единая настройка лояльности на клуб (можно завести per-club запись).
+model LoyaltySettings {
+  id                   String       @id @default(cuid())
+  clubId               String       @unique
+  sumDiscounts         Boolean      @default(false) // складывать авто-скидку с ручной группой, иначе берём большую
+  recalcPeriod         RecalcPeriod @default(M3)
+  birthdayBonusEnabled Boolean      @default(false)
+  birthdayBonusAmount  Decimal      @default(0) @db.Decimal(12, 2)
+}
+
+// Автоматическая группа лояльности — диапазон отыгранных часов (без пересечений).
+model LoyaltyTier {
+  id              String @id @default(cuid())
+  name            String
+  minHours        Int
+  maxHours        Int? // null = без верхней границы
+  discountPercent Int    @default(0)
+  cashbackPercent Int    @default(0)
+  sortOrder       Int    @default(0)
+
+  guestStates GuestLoyaltyState[]
+
+  @@index([minHours, maxHours])
+}
+
+// Ручная группа — назначается сотрудником, не пересчитывается автоматически.
+model GuestManualGroup {
+  id              String @id @default(cuid())
+  name            String
+  discountPercent Int    @default(0)
+  cashbackPercent Int    @default(0)
+
+  guests Guest[]
+}
+
+// Текущее состояние лояльности гостя: авто-тир + счётчик часов за период.
+model GuestLoyaltyState {
+  guestId               String       @id
+  guest                 Guest        @relation(fields: [guestId], references: [id])
+  currentTierId         String?
+  currentTier           LoyaltyTier? @relation(fields: [currentTierId], references: [id])
+  playedMinutesInPeriod Int          @default(0)
+  periodStartedAt       DateTime     @default(now())
+  lastRecalculatedAt    DateTime     @default(now())
+  lastBirthdayBonusYear Int?
+}
+
+enum AutoBonusTrigger {
+  REGISTRATION
+  TOPUP
+}
+
+enum RewardType {
+  PERCENT
+  FIXED
+}
+
+enum SourceChannel {
+  CASH_DESK
+  APP
+  TERMINAL
+}
+
+// Правило автобонуса: за регистрацию (разово) или за пополнение (по диапазону суммы).
+model AutoBonusRule {
+  id            String           @id @default(cuid())
+  clubId        String?
+  club          Club?            @relation(fields: [clubId], references: [id]) // null = все клубы
+  trigger       AutoBonusTrigger
+  minAmount     Decimal?         @db.Decimal(12, 2) // для TOPUP
+  maxAmount     Decimal?         @db.Decimal(12, 2)
+  rewardType    RewardType
+  rewardValue   Decimal          @db.Decimal(12, 2)
+  sourceChannel SourceChannel? // null = все каналы; "Приложение" не привязывается к клубу
+  active        Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+
+  @@index([trigger, active])
+}
+
+// ---------------------------------------------------------------------------
+// Refunds (обязательное юридическое требование, ст. 32 ЗоЗПП)
+// ---------------------------------------------------------------------------
+
+enum RefundStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+model RefundRequest {
+  id               String       @id @default(cuid())
+  guestId          String
+  guest            Guest        @relation(fields: [guestId], references: [id])
+  amount           Decimal      @db.Decimal(12, 2)
+  reason           String?
+  status           RefundStatus @default(PENDING)
+  requestedAt      DateTime     @default(now())
+  decidedByStaffId String?
+  decidedAt        DateTime?
+  rejectionComment String?
+  ledgerEntryId    String?      @unique
+
+  @@index([guestId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Payments & fiscalization — STUB providers.
+// Real Т-Банк (СБП/эквайринг + ОФД облачная касса) integration is a follow-up;
+// the provider enum + adapter interface (src/modules/payments/provider.ts) is
+// the extension point so swapping STUB → TBANK_* touches only the adapter.
+// ---------------------------------------------------------------------------
+
+enum PaymentProviderType {
+  STUB
+  TBANK_SBP
+  TBANK_ACQUIRING
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+model PaymentTransaction {
+  id            String              @id @default(cuid())
+  guestId       String
+  guest         Guest               @relation(fields: [guestId], references: [id])
+  amount        Decimal             @db.Decimal(12, 2)
+  provider      PaymentProviderType @default(STUB)
+  status        PaymentStatus       @default(PENDING)
+  externalId    String?
+  createdAt     DateTime            @default(now())
+  completedAt   DateTime?
+  ledgerEntryId String?             @unique
+
+  fiscalReceipt FiscalReceipt?
+
+  @@index([guestId, status])
+}
+
+enum FiscalProviderType {
+  STUB
+  TBANK_OFD
+}
+
+enum FiscalStatus {
+  PENDING
+  ISSUED
+  FAILED
+}
+
+model FiscalReceipt {
+  id                   String             @id @default(cuid())
+  paymentTransactionId String             @unique
+  paymentTransaction   PaymentTransaction @relation(fields: [paymentTransactionId], references: [id])
+  provider             FiscalProviderType @default(STUB)
+  status               FiscalStatus       @default(PENDING)
+  fiscalDocNumber      String?
+  fiscalUrl            String?
+  issuedAt             DateTime?
+  errorMessage         String?
+
+  @@index([status])
+}
