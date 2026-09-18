@@ -35,13 +35,19 @@ jobs:
           cache: gradle
 
       # ubuntu-latest уже несёт предустановленный Android SDK (ANDROID_HOME
-      # + sdkmanager на PATH) — отдельный setup-action не нужен и оказался
-      # ненадёжным (android-actions/setup-android@v3 падает, пытаясь
-      # поставить давно удалённый из репозитория Google пакет "tools").
+      # задан), но cmdline-tools/<version>/bin не в PATH — отдельный
+      # setup-action не нужен и оказался ненадёжным (android-actions/
+      # setup-android@v3 падает, пытаясь поставить давно удалённый из
+      # репозитория Google пакет "tools"), поэтому находим sdkmanager сами.
       - name: Install SDK platform & build-tools
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
-          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 2 -name sdkmanager -type f | sort -V | tail -1)
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -name sdkmanager -type f | sort -V | tail -1)
+          if [ -z "$SDKMANAGER" ]; then
+            echo "::error::sdkmanager not found under $ANDROID_HOME/cmdline-tools"
+            find "$ANDROID_HOME" -maxdepth 3
+            exit 1
+          fi
           echo "Using sdkmanager: $SDKMANAGER"
           yes | "$SDKMANAGER" --licenses > /dev/null || true
           "$SDKMANAGER" "platforms;android-34" "build-tools;34.0.0"
