@@ -2,7 +2,7 @@ package ru.club404.guest.data
 
 /**
  * Офлайн-заглушка вместо реального вызова LLM. В полной версии бэкенда
- * (backend/src/lib/llm/*) это один вызов LLMClient.complete(system, messages)
+ * (backend/src/lib/llm) это один вызов LLMClient.complete(system, messages)
  * с сюда собранным system-промптом; здесь — простой поиск по ключевым словам,
  * чтобы приложение работало без сети и без API-ключа. Конвенция ESCALATE:
  * та же — если вопрос не покрыт контекстом гостя и FAQ, эскалируем.
