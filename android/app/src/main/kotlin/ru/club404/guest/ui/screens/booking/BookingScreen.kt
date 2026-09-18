@@ -8,13 +8,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -38,9 +39,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.IntrinsicSize
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ru.club404.guest.data.Booking
+import ru.club404.guest.data.Station
+import ru.club404.guest.data.Zone
 import ru.club404.guest.data.formatDateTime
 import ru.club404.guest.data.formatMoney
 import ru.club404.guest.ui.components.InfoCard
@@ -82,9 +86,6 @@ fun BookingScreen(onOpenBalance: () -> Unit) {
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var selectedSlotMinutes by remember { mutableStateOf<Int?>(null) }
 
-    fun zoneColorFor(zoneId: String): Color =
-        state.zones.firstOrNull { it.id == zoneId }?.colorHex?.let(::hexColor) ?: Accent
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -111,27 +112,12 @@ fun BookingScreen(onOpenBalance: () -> Unit) {
                 "Оплата сразу с баланса, ПК включится сам за 5 минут до начала.",
                 color = TextMuted, style = MaterialTheme.typography.bodyMedium,
             )
-            // Графическая карта по комнатам вместо плоской сетки кнопок —
-            // цвет места берётся из Zone.colorHex, как на сайте.
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                state.stations.groupBy { it.room }.forEach { (room, seats) ->
-                    val zoneColor = zoneColorFor(seats.first().zoneId)
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        RoomHeader(roomLabels[room] ?: room, zoneColor)
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            seats.forEach { station ->
-                                SeatTile(
-                                    label = "Место ${station.seat}",
-                                    tariffPerHour = station.tariffPerHour,
-                                    zoneColor = zoneColor,
-                                    selected = station.id == state.selectedStationId,
-                                    onClick = { viewModel.selectStation(station.id) },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            FloorPlan(
+                stations = state.stations,
+                zones = state.zones,
+                selectedStationId = state.selectedStationId,
+                onSelect = viewModel::selectStation,
+            )
         }
 
         if (state.selectedStationId != null) {
@@ -281,35 +267,130 @@ private fun SectionLabel(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium)
 }
 
+// Схема зала — топология (что где стоит) списана с реального плана клуба на
+// скриншоте бронирования LANGAME (тот же адрес, Чапаевская 178): слева SOLO /
+// SOLO+ / DUO 1, справа тех.зона (не бронируется) и DUO 2, снизу W/C и техника
+// (чайник/кофемашина/холодильник/куллер — тоже с того скриншота, это реальные
+// удобства клуба, не выдумка). Комнаты жёстко привязаны к местам в разметке,
+// а не выводятся из произвольного списка станций, — так и должно быть для
+// чертежа конкретного помещения.
 @Composable
-private fun RoomHeader(label: String, zoneColor: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(Modifier.size(10.dp).clip(CircleShape).background(zoneColor))
-        Text(label, style = MaterialTheme.typography.titleMedium)
+private fun FloorPlan(
+    stations: List<Station>,
+    zones: List<Zone>,
+    selectedStationId: String?,
+    onSelect: (String) -> Unit,
+) {
+    fun zoneColorFor(zoneId: String): Color =
+        zones.firstOrNull { it.id == zoneId }?.colorHex?.let(::hexColor) ?: Accent
+    fun stationsFor(room: String) = stations.filter { it.room == room }
+
+    val solo = stationsFor("solo-1")
+    val soloPlus = stationsFor("solo-plus")
+    val duo1 = stationsFor("duo-1")
+    val duo2 = stationsFor("duo-2")
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+    ) {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Column(Modifier.weight(1f)) {
+                FloorCompartment("SOLO", solo, zoneColorFor(solo.firstOrNull()?.zoneId ?: ""), selectedStationId, onSelect)
+                HorizontalDivider(color = BorderColor)
+                FloorCompartment("SOLO+", soloPlus, zoneColorFor(soloPlus.firstOrNull()?.zoneId ?: ""), selectedStationId, onSelect)
+                HorizontalDivider(color = BorderColor)
+                FloorCompartment("DUO 1", duo1, zoneColorFor(duo1.firstOrNull()?.zoneId ?: ""), selectedStationId, onSelect)
+            }
+            Box(Modifier.width(1.dp).fillMaxHeight().background(BorderColor))
+            Column(Modifier.weight(1f)) {
+                TechZoneCompartment()
+                HorizontalDivider(color = BorderColor)
+                FloorCompartment("DUO 2", duo2, zoneColorFor(duo2.firstOrNull()?.zoneId ?: ""), selectedStationId, onSelect)
+            }
+        }
+        HorizontalDivider(color = BorderColor)
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Box(Modifier.weight(1f).padding(12.dp), contentAlignment = Alignment.Center) {
+                Text("W/C", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+            }
+            Box(Modifier.width(1.dp).fillMaxHeight().background(BorderColor))
+            Column(Modifier.weight(1f).padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Чайник · кофемашина", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                Text("Холодильник · кулер", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
     }
 }
 
 @Composable
-private fun SeatTile(
+private fun FloorCompartment(
+    label: String,
+    seats: List<Station>,
+    zoneColor: Color,
+    selectedStationId: String?,
+    onSelect: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(label, color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+        seats.forEach { station ->
+            FloorSeatTile(
+                label = "Место ${station.seat}",
+                tariffPerHour = station.tariffPerHour,
+                zoneColor = zoneColor,
+                selected = station.id == selectedStationId,
+                onClick = { onSelect(station.id) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun TechZoneCompartment() {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("Тех. зона", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(PanelRaised)
+                .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+        ) {
+            Text("не бронируется", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun FloorSeatTile(
     label: String,
     tariffPerHour: Int,
     zoneColor: Color,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    Column(
+    Row(
         modifier = Modifier
-            .width(96.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
             .background(if (selected) zoneColor.copy(alpha = 0.18f) else PanelRaised)
-            .border(if (selected) 2.dp else 1.dp, if (selected) zoneColor else BorderColor, RoundedCornerShape(14.dp))
+            .border(if (selected) 2.dp else 1.dp, if (selected) zoneColor else BorderColor, RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp, horizontal = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(Icons.Filled.DesktopWindows, contentDescription = null, tint = zoneColor)
-        Text(label, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
+        Icon(Icons.Filled.DesktopWindows, contentDescription = null, tint = zoneColor, modifier = Modifier.size(18.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Text("$tariffPerHour ₽/ч", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
     }
 }
