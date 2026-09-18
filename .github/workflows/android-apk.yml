@@ -34,11 +34,13 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
+      # ubuntu-latest уже несёт предустановленный Android SDK (ANDROID_HOME
+      # + sdkmanager на PATH) — отдельный setup-action не нужен и оказался
+      # ненадёжным (android-actions/setup-android@v3 падает, пытаясь
+      # поставить давно удалённый из репозитория Google пакет "tools").
       - name: Install SDK platform & build-tools
         run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
           yes | sdkmanager --licenses > /dev/null || true
           sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
