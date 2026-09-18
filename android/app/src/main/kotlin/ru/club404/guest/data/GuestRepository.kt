@@ -22,6 +22,10 @@ interface GuestRepository {
     val loyaltyTiers: List<LoyaltyTier>
 
     suspend fun login(phone: String, password: String): Result<Guest>
+
+    // Как на сайте — регистрация НЕ логинит гостя автоматически, анкета
+    // уходит "на проверку" (см. RegStatus). Вызывающая сторона переводит UI
+    // на экран ожидания сама; войти можно отдельным вызовом login().
     suspend fun register(phone: String, password: String, fio: String): Result<Guest>
     fun logout()
 
@@ -33,6 +37,18 @@ interface GuestRepository {
     suspend fun createBooking(stationId: String, startAt: Instant, minutes: Int): Result<Booking>
     suspend fun cancelBooking(bookingId: String): Result<Unit>
     suspend fun redeemCode(code: String): Result<Booking>
+
+    // Продление активной сессии со станции-виджета в приложении — те же
+    // правила, что в frontend/pc-widget.html: цена считается по flat
+    // tariffPerHour станции (без сетки/лояльности, ровно как у виджета на
+    // ПК), minutes/priceRub уже посчитаны вызывающей стороной (см.
+    // SessionWidget: пакеты 3ч/6ч или шаг по 10 мин).
+    suspend fun extendActiveSession(minutes: Int, priceRub: Int): Result<Unit>
+
+    // Досрочное завершение сессии гостем через виджет — только после
+    // подтверждения чистоты места (см. EndSessionScreen); истечение
+    // оплаченного времени само по себе сюда не попадает.
+    suspend fun endActiveSessionWithReport(): Result<Unit>
 
     suspend fun topUp(amountRub: Int): Result<Unit>
     suspend fun requestRefund(amountRub: Int, reason: String): Result<Unit>

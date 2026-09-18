@@ -44,6 +44,4 @@ class HomeViewModel(private val repository: GuestRepository) : ViewModel() {
                 }
         }
     }
-
-    fun logout() = repository.logout()
 }

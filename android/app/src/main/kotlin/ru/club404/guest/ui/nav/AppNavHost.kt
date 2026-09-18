@@ -24,6 +24,7 @@ import ru.club404.guest.ui.screens.balance.BalanceScreen
 import ru.club404.guest.ui.screens.booking.BookingScreen
 import ru.club404.guest.ui.screens.club.ClubInfoScreen
 import ru.club404.guest.ui.screens.entry.EntryScreen
+import ru.club404.guest.ui.screens.home.EndSessionScreen
 import ru.club404.guest.ui.screens.home.HomeScreen
 import ru.club404.guest.ui.screens.prices.PricesScreen
 import ru.club404.guest.ui.screens.profile.ProfileScreen
@@ -95,12 +96,13 @@ fun AppNavHost() {
             }
             composable(Screen.Register.route) {
                 RegisterScreen(
-                    onRegistered = {
-                        navController.navigate(Screen.Home.route) {
-                            popUpTo(navController.graph.id) { inclusive = true }
+                    // Как на сайте: регистрация не логинит автоматически — анкета
+                    // уходит "на проверку", гость сам идёт логиниться дальше.
+                    onGoToLogin = {
+                        navController.navigate(Screen.Entry.route) {
+                            popUpTo(Screen.Register.route) { inclusive = true }
                         }
                     },
-                    onBackToLogin = { navController.popBackStack() },
                 )
             }
             composable(Screen.Home.route) {
@@ -108,13 +110,19 @@ fun AppNavHost() {
                     onOpenBooking = { navController.navigate(Screen.Booking.route) },
                     onOpenBalance = { navController.navigate(Screen.Balance.route) },
                     onOpenSupport = { navController.navigate(Screen.Support.route) },
+                    onOpenEndSession = { navController.navigate(Screen.EndSession.route) },
                     onOpenPrices = { navController.navigate(Screen.Prices.route) },
                     onOpenPromotions = { navController.navigate(Screen.Promotions.route) },
                     onOpenClubInfo = { navController.navigate(Screen.ClubInfo.route) },
                 )
             }
-            composable(Screen.Booking.route) { BookingScreen() }
+            composable(Screen.Booking.route) {
+                BookingScreen(onOpenBalance = { navController.navigate(Screen.Balance.route) })
+            }
             composable(Screen.Balance.route) { BalanceScreen() }
+            composable(Screen.EndSession.route) {
+                EndSessionScreen(onDone = { navController.popBackStack() })
+            }
             composable(Screen.Support.route) { SupportChatScreen() }
             composable(Screen.Profile.route) {
                 ProfileScreen(

@@ -98,10 +98,13 @@ class MockGuestRepository : GuestRepository {
         if (guests.any { it.phone == phone.trim() }) {
             return Result.failure(IllegalArgumentException("Такой телефон уже зарегистрирован"))
         }
-        val guest = Guest(id = "g${guestSeq++}", phone = phone.trim(), password = password, fio = fio.trim(), balanceRub = 0, bonusPoints = 500, loyaltyTierId = null)
+        // regStatus = APPROVED сразу — в приложении нет админки, которая в
+        // реальности рассматривает анкету (см. RegStatus в Models.kt), так
+        // что "проверка" здесь чисто визуальная (экран ожидания), а не
+        // фактическая блокировка входа.
+        val guest = Guest(id = "g${guestSeq++}", phone = phone.trim(), password = password, fio = fio.trim(), balanceRub = 0, bonusPoints = 500, loyaltyTierId = null, regStatus = RegStatus.APPROVED)
         guests.add(guest)
-        _currentGuest.value = guest
-        refreshBookingsFlow()
+        // Без авто-логина — как на сайте, гость сам идёт логиниться после экрана ожидания.
         return Result.success(guest)
     }
 
@@ -214,6 +217,29 @@ class MockGuestRepository : GuestRepository {
         if (booking.status == BookingStatus.CONFIRMED) booking.status = BookingStatus.REDEEMED
         refreshBookingsFlow()
         return Result.success(booking)
+    }
+
+    override suspend fun extendActiveSession(minutes: Int, priceRub: Int): Result<Unit> {
+        delay(300)
+        val guest = _currentGuest.value ?: return Result.failure(IllegalStateException("Не авторизован"))
+        val booking = activeBooking() ?: return Result.failure(IllegalStateException("Нет активной сессии"))
+        if (guest.balanceRub < priceRub) {
+            return Result.failure(IllegalStateException("Не хватает баланса: нужно ${formatMoney(priceRub)}, на счету ${formatMoney(guest.balanceRub)}"))
+        }
+        guest.balanceRub -= priceRub
+        val index = bookings.indexOfFirst { it.id == booking.id }
+        bookings[index] = booking.copy(minutesPaid = booking.minutesPaid + minutes)
+        _currentGuest.value = guest.copy()
+        refreshBookingsFlow()
+        return Result.success(Unit)
+    }
+
+    override suspend fun endActiveSessionWithReport(): Result<Unit> {
+        delay(400)
+        val booking = activeBooking() ?: return Result.failure(IllegalStateException("Нет активной сессии"))
+        booking.status = BookingStatus.COMPLETED
+        refreshBookingsFlow()
+        return Result.success(Unit)
     }
 
     // --- Balance ------------------------------------------------------

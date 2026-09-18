@@ -13,6 +13,7 @@ sealed class Screen(val route: String) {
     data object Prices : Screen("prices")
     data object Promotions : Screen("promotions")
     data object ClubInfo : Screen("club_info")
+    data object EndSession : Screen("end_session")
 }
 
 // Вкладки нижней навигации — показываются только вошедшему гостю.

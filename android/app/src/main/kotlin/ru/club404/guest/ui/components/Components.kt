@@ -1,18 +1,27 @@
 package ru.club404.guest.ui.components
 
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import ru.club404.guest.data.ChatMessage
 import ru.club404.guest.data.ChatRole
@@ -70,6 +79,36 @@ fun SectionKicker(text: String, modifier: Modifier = Modifier) {
         style = MaterialTheme.typography.labelLarge,
         modifier = modifier,
     )
+}
+
+/**
+ * Слот "сфотографировать документ/селфи/место" — камера через
+ * TakePicturePreview (см. вызывающий код), здесь только превью + подпись.
+ * Общий для RegisterScreen (документ/селфи) и EndSessionScreen (фото места).
+ */
+@Composable
+fun PhotoCaptureBox(bitmap: Bitmap?, placeholder: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        InfoCard(modifier = Modifier.height(140.dp).clip(RoundedCornerShape(14.dp))) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Text(placeholder, color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+        TextButton(onClick = onClick) { Text(if (bitmap != null) "Переснять" else "Открыть камеру") }
+    }
 }
 
 @Composable

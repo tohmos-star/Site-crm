@@ -2,6 +2,14 @@ package ru.club404.guest.data
 
 import java.time.Instant
 
+// Как на сайте (frontend/register.html): после регистрации анкета уходит на
+// проверку — PENDING, войти можно только после APPROVED. В приложении нет
+// админки для решения по анкете (см. android/README.md), поэтому
+// MockGuestRepository сама переводит PENDING -> APPROVED вскоре после
+// отправки — подменяет отсутствующий шаг ручной проверки персоналом, чтобы
+// весь флоу можно было пройти целиком в демо.
+enum class RegStatus { PENDING, APPROVED }
+
 data class Guest(
     val id: String,
     val phone: String,
@@ -10,6 +18,7 @@ data class Guest(
     var balanceRub: Int,
     var bonusPoints: Int,
     val loyaltyTierId: String?,
+    var regStatus: RegStatus = RegStatus.APPROVED,
 )
 
 data class Zone(val id: String, val nameRu: String, val colorHex: String)
@@ -28,7 +37,10 @@ data class Station(
     val tariffId: String? = null,
 )
 
-enum class BookingStatus { CONFIRMED, REDEEMED, CANCELLED, EXPIRED }
+// COMPLETED — гость сам завершил сессию досрочно через виджет (после
+// подтверждения чистоты рабочего места); EXPIRED — просто закончилось
+// оплаченное время, никто не подтверждал завершение.
+enum class BookingStatus { CONFIRMED, REDEEMED, CANCELLED, EXPIRED, COMPLETED }
 
 data class Booking(
     val id: String,
