@@ -23,6 +23,7 @@ import androidx.navigation.compose.composable
 import ru.club404.guest.ui.screens.balance.BalanceScreen
 import ru.club404.guest.ui.screens.booking.BookingScreen
 import ru.club404.guest.ui.screens.club.ClubInfoScreen
+import ru.club404.guest.ui.screens.clubentry.ClubEntryScreen
 import ru.club404.guest.ui.screens.entry.EntryScreen
 import ru.club404.guest.ui.screens.home.EndSessionScreen
 import ru.club404.guest.ui.screens.home.HomeScreen
@@ -114,6 +115,7 @@ fun AppNavHost() {
                     onOpenPrices = { navController.navigate(Screen.Prices.route) },
                     onOpenPromotions = { navController.navigate(Screen.Promotions.route) },
                     onOpenClubInfo = { navController.navigate(Screen.ClubInfo.route) },
+                    onOpenClubEntry = { navController.navigate(Screen.ClubEntry.route) },
                 )
             }
             composable(Screen.Booking.route) {
@@ -136,6 +138,7 @@ fun AppNavHost() {
             composable(Screen.Prices.route) { PricesScreen() }
             composable(Screen.Promotions.route) { PromotionsScreen() }
             composable(Screen.ClubInfo.route) { ClubInfoScreen() }
+            composable(Screen.ClubEntry.route) { ClubEntryScreen() }
         }
     }
 }

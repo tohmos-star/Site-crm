@@ -35,6 +35,7 @@ fun HomeScreen(
     onOpenPrices: () -> Unit,
     onOpenPromotions: () -> Unit,
     onOpenClubInfo: () -> Unit,
+    onOpenClubEntry: () -> Unit,
 ) {
     val viewModel = viewModelWithRepo(::HomeViewModel)
     val state by viewModel.state.collectAsState()
@@ -78,6 +79,9 @@ fun HomeScreen(
             onOpenEndSession = onOpenEndSession,
         )
 
+        // Порядок как в MEMBER_PRIMARY на сайте (frontend/js/layout.js):
+        // "Войти в клуб" перед "Забронировать".
+        Button(onClick = onOpenClubEntry, modifier = Modifier.fillMaxWidth()) { Text("Войти в клуб") }
         Button(onClick = onOpenBooking, modifier = Modifier.fillMaxWidth()) { Text("Забронировать") }
 
         InfoCard {

@@ -380,4 +380,16 @@ class MockGuestRepository : GuestRepository {
         val guestId = _currentGuest.value?.id ?: return emptyList()
         return tickets.filter { it.guestId == guestId }.sortedByDescending { it.createdAt }
     }
+
+    override fun entryAccessForCurrentGuest(): EntryAccess? {
+        val guest = _currentGuest.value ?: return null
+        // Стабильно для гостя (не пересоздаётся при каждом открытии экрана) —
+        // как на сайте: "персональный, сгенерирован автоматически именно для вас".
+        val rnd = Random(guest.id.hashCode().toLong())
+        val doorCode = (0 until 7).joinToString("") { rnd.nextInt(10).toString() } + "#"
+        return EntryAccess(
+            intercomUrl = "https://intercom.404kh.example/open?guest=${guest.id}",
+            doorCode = doorCode,
+        )
+    }
 }

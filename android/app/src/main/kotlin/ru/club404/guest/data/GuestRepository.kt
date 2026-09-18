@@ -75,7 +75,15 @@ interface GuestRepository {
     fun buildSupportContext(): GuestSupportContext
     suspend fun sendSupportMessage(message: String, history: List<ChatMessage>): ChatMessage
     fun ticketsForCurrentGuest(): List<SupportTicket>
+
+    // "Войти в клуб" (frontend/entry.html) — общий доступ в помещение, а не
+    // код конкретной сессии/брони (тот см. DoorCodeInfo). Два независимых
+    // шага: ссылка от домофона на первую дверь и персональный код на вторую,
+    // выданные один раз при регистрации и не меняющиеся при каждом заходе.
+    fun entryAccessForCurrentGuest(): EntryAccess?
 }
+
+data class EntryAccess(val intercomUrl: String, val doorCode: String)
 
 data class Promotion(val title: String, val tag: String, val description: String)
 
