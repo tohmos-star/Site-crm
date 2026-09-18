@@ -34,7 +34,11 @@ interface GuestRepository {
     fun nextUpcomingBooking(): Booking?
 
     suspend fun quoteBooking(stationId: String, minutes: Int): BookingQuote
-    suspend fun createBooking(stationId: String, startAt: Instant, minutes: Int): Result<Booking>
+
+    // bonusRubToRedeem: сколько бонусов (1 бонус = 1 ₽) списать в счёт оплаты —
+    // как переключатель "Списать бонусы" на экране подтверждения брони.
+    // Реализация сама ограничивает его балансом бонусов и суммой брони.
+    suspend fun createBooking(stationId: String, startAt: Instant, minutes: Int, bonusRubToRedeem: Int = 0): Result<Booking>
     suspend fun cancelBooking(bookingId: String): Result<Unit>
 
     // Редактирование брони кодом на самой станции (см. frontend/pc-widget.html

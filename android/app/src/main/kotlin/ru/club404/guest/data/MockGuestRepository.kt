@@ -149,7 +149,7 @@ class MockGuestRepository : GuestRepository {
         return BookingQuote(baseAmountRub = baseAmount, amountRub = amount, discountPercent = discountPercent, cashbackRub = cashback)
     }
 
-    override suspend fun createBooking(stationId: String, startAt: Instant, minutes: Int): Result<Booking> {
+    override suspend fun createBooking(stationId: String, startAt: Instant, minutes: Int, bonusRubToRedeem: Int): Result<Booking> {
         delay(400)
         val guest = _currentGuest.value ?: return Result.failure(IllegalStateException("Не авторизован"))
         if (minutes < 10) return Result.failure(IllegalArgumentException("Минимальная длительность брони — 10 минут"))
@@ -167,10 +167,13 @@ class MockGuestRepository : GuestRepository {
             return Result.failure(IllegalStateException("Это место занято рядом с выбранным временем — нужен зазор 60 минут между бронями"))
         }
         val quote = quoteBooking(stationId, minutes)
-        if (guest.balanceRub < quote.amountRub) {
-            return Result.failure(IllegalStateException("Не хватает баланса: нужно ${formatMoney(quote.amountRub)}, на счету ${formatMoney(guest.balanceRub)}"))
+        val bonusRedeemed = bonusRubToRedeem.coerceIn(0, minOf(guest.bonusPoints, quote.amountRub))
+        val amountFromBalance = quote.amountRub - bonusRedeemed
+        if (guest.balanceRub < amountFromBalance) {
+            return Result.failure(IllegalStateException("Не хватает баланса: нужно ${formatMoney(amountFromBalance)}, на счету ${formatMoney(guest.balanceRub)}"))
         }
-        guest.balanceRub -= quote.amountRub
+        guest.balanceRub -= amountFromBalance
+        guest.bonusPoints -= bonusRedeemed
         if (quote.cashbackRub > 0) guest.bonusPoints += quote.cashbackRub
         val booking = Booking(
             id = "bk-${bookingSeq++}",
@@ -178,7 +181,7 @@ class MockGuestRepository : GuestRepository {
             stationId = stationId,
             startAt = startAt,
             minutesPaid = minutes,
-            amountRub = quote.amountRub,
+            amountRub = amountFromBalance,
             code = (100000 + Random.nextInt(900000)).toString(),
             status = BookingStatus.CONFIRMED,
         )

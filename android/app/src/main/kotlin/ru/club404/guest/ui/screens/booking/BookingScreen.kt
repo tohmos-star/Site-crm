@@ -18,12 +18,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,6 +56,7 @@ import ru.club404.guest.ui.theme.TextPrimary
 import ru.club404.guest.ui.theme.hexColor
 import ru.club404.guest.ui.viewModelWithRepo
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -69,10 +72,15 @@ fun BookingScreen(onOpenBalance: () -> Unit) {
         return
     }
 
-    // Своя лента дат + сетка часов вместо системных DatePicker/TimePicker —
+    if (state.pendingConfirmation) {
+        BookingConfirmScreen(state, viewModel)
+        return
+    }
+
+    // Своя лента дат + лента времени вместо системных DatePicker/TimePicker —
     // крупнее, без диалогов поверх экрана, в стиле карточек LANGAME.
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-    var selectedHour by remember { mutableStateOf<Int?>(null) }
+    var selectedSlotMinutes by remember { mutableStateOf<Int?>(null) }
 
     fun zoneColorFor(zoneId: String): Color =
         state.zones.firstOrNull { it.id == zoneId }?.colorHex?.let(::hexColor) ?: Accent
@@ -140,61 +148,68 @@ fun BookingScreen(onOpenBalance: () -> Unit) {
                         DateChip(
                             date = date,
                             selected = date == selectedDate,
-                            onClick = { selectedDate = date; selectedHour = null },
+                            onClick = { selectedDate = date; selectedSlotMinutes = null },
                         )
                     }
                 }
 
-                Text("Время", color = TextMuted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
-                val availableHours = availableHoursFor(selectedDate)
-                if (availableHours.isEmpty()) {
-                    Text("На сегодня свободных часов не осталось — выберите другой день.", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                // Как на LANGAME: почасовой тариф — произвольная длительность
+                // шагом; пакеты — фиксированные 3ч/6ч. Переключаются вкладками.
+                TariffModeToggle(mode = state.tariffMode, onModeChange = viewModel::setTariffMode)
+
+                Text("Время начала", color = TextMuted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+                val slots = timeSlotsFor(selectedDate)
+                if (slots.isEmpty()) {
+                    Text("На сегодня свободного времени не осталось — выберите другой день.", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
                 } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        availableHours.chunked(4).forEach { row ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                                row.forEach { hour ->
-                                    TimeSlotChip(
-                                        hour = hour,
-                                        selected = hour == selectedHour,
-                                        onClick = {
-                                            selectedHour = hour
-                                            viewModel.setStartAt(
-                                                selectedDate.atTime(hour, 0).atZone(ZoneId.systemDefault()).toInstant(),
-                                            )
-                                        },
-                                        modifier = Modifier.weight(1f),
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        slots.forEach { slotMinutes ->
+                            TimeSlotChip(
+                                minutesSinceMidnight = slotMinutes,
+                                selected = slotMinutes == selectedSlotMinutes,
+                                onClick = {
+                                    selectedSlotMinutes = slotMinutes
+                                    viewModel.setStartAt(
+                                        selectedDate.atStartOfDay().plusMinutes(slotMinutes.toLong())
+                                            .atZone(ZoneId.systemDefault()).toInstant(),
                                     )
-                                }
-                            }
+                                },
+                            )
                         }
                     }
                 }
 
-                Text("Длительность", color = TextMuted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    durationPresets.forEach { (minutes, label) ->
-                        DurationChip(
-                            label = label,
-                            selected = minutes == state.durationMinutes,
-                            onClick = { viewModel.setDurationMinutes(minutes) },
+                if (state.tariffMode == TariffMode.HOURLY) {
+                    Text("Продолжительность", color = TextMuted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        OutlinedButton(onClick = { viewModel.setDurationMinutes(state.durationMinutes - DURATION_STEP_MINUTES) }) { Text("−") }
+                        Text(
+                            "${state.durationMinutes} мин",
+                            style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
                         )
+                        OutlinedButton(onClick = { viewModel.setDurationMinutes(state.durationMinutes + DURATION_STEP_MINUTES) }) { Text("+") }
                     }
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                ) {
-                    OutlinedButton(onClick = { viewModel.setDurationMinutes(state.durationMinutes - DURATION_STEP_MINUTES) }) { Text("−") }
-                    Text(
-                        "${state.durationMinutes} мин",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
-                    )
-                    OutlinedButton(onClick = { viewModel.setDurationMinutes(state.durationMinutes + DURATION_STEP_MINUTES) }) { Text("+") }
+                } else {
+                    Text("Пакет", color = TextMuted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        packagePresets.forEach { (minutes, label) ->
+                            DurationChip(
+                                label = label,
+                                selected = minutes == state.durationMinutes,
+                                onClick = { viewModel.setDurationMinutes(minutes) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
                 }
 
                 state.quote?.let { quote ->
@@ -211,12 +226,10 @@ fun BookingScreen(onOpenBalance: () -> Unit) {
                 state.error?.let { StatusBanner(it, StatusKind.ERROR) }
 
                 Button(
-                    onClick = viewModel::confirmBooking,
+                    onClick = viewModel::proceedToConfirmation,
                     enabled = !state.loading && state.startAt != null,
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                ) {
-                    Text(if (state.loading) "Бронируем…" else "Забронировать и оплатить")
-                }
+                ) { Text("Далее") }
             }
         }
 
@@ -236,15 +249,32 @@ fun BookingScreen(onOpenBalance: () -> Unit) {
     }
 }
 
-// Бронь минимум за 5 минут от текущего момента (правило подтверждается в
-// BookingViewModel.confirmBooking) — на сегодня прошлые и ближайшие 5 минут
-// просто не показываем как варианты.
-private fun availableHoursFor(date: LocalDate): List<Int> {
-    val now = java.time.LocalDateTime.now()
-    return (0..23).filter { hour ->
-        date != LocalDate.now() || date.atTime(hour, 0).isAfter(now.plusMinutes(5))
+// Первый слот — ровно "сейчас + 5 минут" (как 13:08 на LANGAME-скриншотах),
+// дальше сетка по 30 минут до конца суток. На будущие дни — вся сетка с 00:00.
+private fun timeSlotsFor(date: LocalDate): List<Int> {
+    val slots = mutableListOf<Int>()
+    if (date == LocalDate.now()) {
+        val earliest = LocalDateTime.now().plusMinutes(5)
+        val earliestMinute = earliest.hour * 60 + earliest.minute
+        if (earliestMinute >= 24 * 60) return emptyList()
+        slots += earliestMinute
+        var next = ((earliestMinute / 30) + 1) * 30
+        while (next < 24 * 60) {
+            slots += next
+            next += 30
+        }
+    } else {
+        var m = 0
+        while (m < 24 * 60) {
+            slots += m
+            m += 30
+        }
     }
+    return slots
 }
+
+private fun formatSlot(minutesSinceMidnight: Int): String =
+    "%02d:%02d".format(minutesSinceMidnight / 60, minutesSinceMidnight % 60)
 
 @Composable
 private fun SectionLabel(text: String) {
@@ -302,14 +332,47 @@ private fun DateChip(date: LocalDate, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun TimeSlotChip(hour: Int, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun TimeSlotChip(minutesSinceMidnight: Int, selected: Boolean, onClick: () -> Unit) {
     PillTile(
-        topLabel = "%02d:00".format(hour),
+        topLabel = formatSlot(minutesSinceMidnight),
         bottomLabel = null,
         selected = selected,
         onClick = onClick,
-        modifier = modifier,
+        modifier = Modifier.width(72.dp),
     )
+}
+
+@Composable
+private fun TariffModeToggle(mode: TariffMode, onModeChange: (TariffMode) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(PanelRaised)
+            .padding(4.dp),
+    ) {
+        TariffModeSegment("Почасовой тариф", selected = mode == TariffMode.HOURLY, onClick = { onModeChange(TariffMode.HOURLY) }, modifier = Modifier.weight(1f))
+        TariffModeSegment("Пакеты времени", selected = mode == TariffMode.PACKAGE, onClick = { onModeChange(TariffMode.PACKAGE) }, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun TariffModeSegment(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(9.dp))
+            .background(if (selected) BorderColor else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(vertical = 9.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = if (selected) TextPrimary else TextMuted,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+        )
+    }
 }
 
 @Composable
@@ -337,6 +400,106 @@ private fun PillTile(
         Text(topLabel, color = if (selected) Accent else TextPrimary, style = MaterialTheme.typography.bodyMedium)
         if (bottomLabel != null) {
             Text(bottomLabel, color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+// Отдельный шаг подтверждения перед списанием денег — время/место/сумма и
+// переключатель "Списать бонусы", как на экране "Подтверди бронирование" у
+// LANGAME (включая состояние кнопки "Недостаточно средств").
+@Composable
+private fun BookingConfirmScreen(state: BookingUiState, viewModel: BookingViewModel) {
+    val station = state.stations.firstOrNull { it.id == state.selectedStationId }
+    val quote = state.quote
+    val amount = quote?.amountRub ?: 0
+    val bonusAvailable = minOf(state.guestBonusPoints, amount)
+    val bonusRedeemed = if (state.useBonus) bonusAvailable else 0
+    val totalToPay = amount - bonusRedeemed
+    val insufficientFunds = totalToPay > state.guestBalance
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        SectionKicker("club.booking")
+        Text("Подтверди бронирование", style = MaterialTheme.typography.titleLarge)
+
+        InfoCard {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.CalendarToday, contentDescription = null, tint = TextMuted)
+                Column {
+                    Text("Выбранное время", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "${state.startAt?.let { formatDateTime(it) } ?: "—"} · ${state.durationMinutes} мин",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            }
+        }
+
+        InfoCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.DesktopWindows, contentDescription = null, tint = TextMuted)
+                    Column {
+                        Text("Выбранное место", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                        Text(station?.label ?: "—", style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+                TextButton(onClick = viewModel::cancelConfirmation) { Text("Изменить") }
+            }
+        }
+
+        InfoCard {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Сумма к оплате", style = MaterialTheme.typography.bodyMedium)
+                Text(formatMoney(amount), style = MaterialTheme.typography.bodyMedium)
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Текущий баланс", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                Text(formatMoney(state.guestBalance), color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+            }
+            if (state.guestBonusPoints > 0) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
+                        Text("Списать бонусы", style = MaterialTheme.typography.bodyMedium)
+                        Text("Доступно: ${state.guestBonusPoints}", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Switch(checked = state.useBonus, onCheckedChange = { viewModel.toggleUseBonus() })
+                }
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Итого к оплате", style = MaterialTheme.typography.titleMedium)
+                Text(formatMoney(totalToPay), style = MaterialTheme.typography.titleMedium)
+            }
+        }
+
+        state.error?.let { StatusBanner(it, StatusKind.ERROR) }
+
+        Button(
+            onClick = viewModel::confirmBooking,
+            enabled = !state.loading && !insufficientFunds,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                when {
+                    state.loading -> "Бронируем…"
+                    insufficientFunds -> "Недостаточно средств"
+                    else -> "Подтвердить бронирование"
+                },
+            )
         }
     }
 }
