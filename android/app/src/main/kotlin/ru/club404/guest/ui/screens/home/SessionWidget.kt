@@ -82,6 +82,9 @@ fun SessionWidget(
                 Text("Место: ${nextStation?.label ?: "—"}", style = MaterialTheme.typography.bodyMedium)
                 Text(formatDateTime(nextBooking.startAt), color = TextMuted, style = MaterialTheme.typography.bodyMedium)
                 Text("Код от неё вводится на самой станции при приходе.", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(4.dp))
+                Text("Код брони", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                Text(nextBooking.code, style = MaterialTheme.typography.titleLarge, color = Ok)
             }
             else -> {
                 Text("Активной сессии и броней нет", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
