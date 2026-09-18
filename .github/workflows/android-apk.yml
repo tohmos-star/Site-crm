@@ -1,9 +1,21 @@
 name: Build Android debug APK
 
-# Ручной запуск. Собирает android/ (гостевое приложение 404 Киберхаус) в
-# GitHub Actions, т.к. в среде разработки заблокирован dl.google.com
-# (нужен и для Android Gradle Plugin, и для самого SDK) — см. android/README.md.
+# Собирает android/ (гостевое приложение 404 Киберхаус) в GitHub Actions,
+# т.к. в среде разработки заблокирован dl.google.com (нужен и для Android
+# Gradle Plugin, и для самого SDK) — см. android/README.md.
+#
+# on: push (не только workflow_dispatch) — умышленно: workflow_dispatch
+# требует, чтобы файл workflow'а сначала попал в дефолтную ветку репозитория
+# (её мы не трогаем — эта ветка отдельная, по заданию), иначе GitHub не
+# показывает кнопку/API для ручного запуска на не-дефолтной ветке. push
+# триггерится сразу из содержимого коммита на самой ветке.
 on:
+  push:
+    branches:
+      - claude/android-guest-app
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-apk.yml'
   workflow_dispatch: {}
 
 jobs:
