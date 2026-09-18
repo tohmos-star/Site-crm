@@ -18,6 +18,9 @@ on:
       - '.github/workflows/android-apk.yml'
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -64,3 +67,17 @@ jobs:
           name: club404-guest-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      # Workflow-artifact downloads (above) redirect through Azure Blob
+      # Storage, which is blocked for whoever asked for this build - a
+      # GitHub Release asset instead serves through
+      # objects.githubusercontent.com, which isn't. One release per run
+      # (tag includes the run number) so re-runs don't collide.
+      - name: Publish APK as a release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-apk-run-${{ github.run_number }}
+          name: Guest app debug APK (run ${{ github.run_number }})
+          body: Debug APK built from ${{ github.sha }}. Sideload-only build - not for the Play Store.
+          prerelease: true
+          files: android/app/build/outputs/apk/debug/app-debug.apk
