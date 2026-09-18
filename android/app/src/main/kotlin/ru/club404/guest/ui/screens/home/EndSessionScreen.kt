@@ -1,7 +1,5 @@
 package ru.club404.guest.ui.screens.home
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,6 +24,7 @@ import ru.club404.guest.ui.components.PhotoCaptureBox
 import ru.club404.guest.ui.components.SectionKicker
 import ru.club404.guest.ui.components.StatusBanner
 import ru.club404.guest.ui.components.StatusKind
+import ru.club404.guest.ui.components.rememberCameraCaptureLauncher
 import ru.club404.guest.ui.theme.TextMuted
 import ru.club404.guest.ui.viewModelWithRepo
 
@@ -40,15 +39,9 @@ fun EndSessionScreen(onDone: () -> Unit) {
         if (state.done) onDone()
     }
 
-    val docLauncher0 = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-        if (bitmap != null) viewModel.onPhoto0Taken(bitmap)
-    }
-    val docLauncher1 = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-        if (bitmap != null) viewModel.onPhoto1Taken(bitmap)
-    }
-    val docLauncher2 = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-        if (bitmap != null) viewModel.onPhoto2Taken(bitmap)
-    }
+    val takePhoto0 = rememberCameraCaptureLauncher(viewModel::onPhoto0Taken)
+    val takePhoto1 = rememberCameraCaptureLauncher(viewModel::onPhoto1Taken)
+    val takePhoto2 = rememberCameraCaptureLauncher(viewModel::onPhoto2Taken)
 
     Column(
         modifier = Modifier
@@ -72,9 +65,9 @@ fun EndSessionScreen(onDone: () -> Unit) {
 
         Text("Фото места (минимум 2)", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            PhotoCaptureBox(bitmap = state.photo0, placeholder = "Фото 1", onClick = { docLauncher0.launch(null) }, modifier = Modifier.weight(1f))
-            PhotoCaptureBox(bitmap = state.photo1, placeholder = "Фото 2", onClick = { docLauncher1.launch(null) }, modifier = Modifier.weight(1f))
-            PhotoCaptureBox(bitmap = state.photo2, placeholder = "Необязательно", onClick = { docLauncher2.launch(null) }, modifier = Modifier.weight(1f))
+            PhotoCaptureBox(bitmap = state.photo0, placeholder = "Фото 1", onClick = takePhoto0, modifier = Modifier.weight(1f))
+            PhotoCaptureBox(bitmap = state.photo1, placeholder = "Фото 2", onClick = takePhoto1, modifier = Modifier.weight(1f))
+            PhotoCaptureBox(bitmap = state.photo2, placeholder = "Необязательно", onClick = takePhoto2, modifier = Modifier.weight(1f))
         }
         Text("Снимок стола и зоны с ПК — этого достаточно.", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
 

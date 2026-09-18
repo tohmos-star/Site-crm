@@ -219,6 +219,52 @@ class MockGuestRepository : GuestRepository {
         return Result.success(booking)
     }
 
+    override fun freeStationsNow(): List<Station> {
+        val now = Instant.now()
+        val occupiedIds = bookings
+            .filter { it.status == BookingStatus.REDEEMED && it.endAt().isAfter(now) }
+            .map { it.stationId }
+            .toSet()
+        return stations.filter { it.id !in occupiedIds }
+    }
+
+    override suspend fun startWalkInSession(stationId: String, minutes: Int): Result<Booking> {
+        delay(400)
+        val guest = _currentGuest.value ?: return Result.failure(IllegalStateException("Не авторизован"))
+        if (minutes < 10) return Result.failure(IllegalArgumentException("Минимальная длительность — 10 минут"))
+        val now = Instant.now()
+        val endAt = now.plusSeconds(minutes * 60L)
+        val bufferSeconds = 60L * 60L
+        val overlaps = bookings.any { b ->
+            b.stationId == stationId &&
+                (b.status == BookingStatus.CONFIRMED || b.status == BookingStatus.REDEEMED) &&
+                now.isBefore(b.endAt().plusSeconds(bufferSeconds)) && b.startAt.isBefore(endAt.plusSeconds(bufferSeconds))
+        }
+        if (overlaps) {
+            return Result.failure(IllegalStateException("Это место сейчас занято или скоро забронировано — выберите другое"))
+        }
+        val quote = quoteBooking(stationId, minutes)
+        if (guest.balanceRub < quote.amountRub) {
+            return Result.failure(IllegalStateException("Не хватает баланса: нужно ${formatMoney(quote.amountRub)}, на счету ${formatMoney(guest.balanceRub)}"))
+        }
+        guest.balanceRub -= quote.amountRub
+        if (quote.cashbackRub > 0) guest.bonusPoints += quote.cashbackRub
+        val booking = Booking(
+            id = "bk-${bookingSeq++}",
+            guestId = guest.id,
+            stationId = stationId,
+            startAt = now,
+            minutesPaid = minutes,
+            amountRub = quote.amountRub,
+            code = (100000 + Random.nextInt(900000)).toString(),
+            status = BookingStatus.REDEEMED,
+        )
+        bookings.add(booking)
+        _currentGuest.value = guest.copy()
+        refreshBookingsFlow()
+        return Result.success(booking)
+    }
+
     override suspend fun extendActiveSession(minutes: Int, priceRub: Int): Result<Unit> {
         delay(300)
         val guest = _currentGuest.value ?: return Result.failure(IllegalStateException("Не авторизован"))

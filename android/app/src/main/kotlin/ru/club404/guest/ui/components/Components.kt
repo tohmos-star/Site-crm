@@ -4,17 +4,21 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ru.club404.guest.data.ChatMessage
 import ru.club404.guest.data.ChatRole
@@ -83,31 +88,36 @@ fun SectionKicker(text: String, modifier: Modifier = Modifier) {
 
 /**
  * Слот "сфотографировать документ/селфи/место" — камера через
- * TakePicturePreview (см. вызывающий код), здесь только превью + подпись.
- * Общий для RegisterScreen (документ/селфи) и EndSessionScreen (фото места).
+ * rememberCameraCaptureLauncher (см. CameraCapture.kt). Весь блок кликабелен
+ * (не только подпись под ним) — так же, как выбор места на боинге на сайте:
+ * бОльшая область нажатия, понятнее, что тут можно тапнуть.
  */
 @Composable
 fun PhotoCaptureBox(bitmap: Bitmap?, placeholder: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
-        InfoCard(modifier = Modifier.height(140.dp).clip(RoundedCornerShape(14.dp))) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Text(placeholder, color = TextMuted, style = MaterialTheme.typography.bodyMedium)
-                }
+    InfoCard(
+        modifier = modifier
+            .height(140.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Icon(Icons.Filled.PhotoCamera, contentDescription = null, tint = TextMuted)
+                Spacer(Modifier.height(6.dp))
+                Text(placeholder, color = TextMuted, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
             }
         }
-        TextButton(onClick = onClick) { Text(if (bitmap != null) "Переснять" else "Открыть камеру") }
     }
 }
 

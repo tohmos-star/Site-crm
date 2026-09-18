@@ -1,5 +1,6 @@
 package ru.club404.guest.ui.screens.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,10 +13,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ru.club404.guest.data.formatMoney
@@ -79,10 +80,27 @@ fun HomeScreen(
 
         Button(onClick = onOpenBooking, modifier = Modifier.fillMaxWidth()) { Text("Забронировать") }
 
-        HorizontalDivider()
+        InfoCard {
+            MenuRow("Цены и тарифы", onOpenPrices)
+            HorizontalDivider()
+            MenuRow("Акции", onOpenPromotions)
+            HorizontalDivider()
+            MenuRow("О клубе", onOpenClubInfo)
+        }
+    }
+}
 
-        TextButton(onClick = onOpenPrices, modifier = Modifier.fillMaxWidth()) { Text("Цены и тарифы") }
-        TextButton(onClick = onOpenPromotions, modifier = Modifier.fillMaxWidth()) { Text("Акции") }
-        TextButton(onClick = onOpenClubInfo, modifier = Modifier.fillMaxWidth()) { Text("О клубе") }
+@Composable
+private fun MenuRow(title: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, style = MaterialTheme.typography.bodyLarge)
+        Text("›", color = TextMuted, style = MaterialTheme.typography.titleMedium)
     }
 }

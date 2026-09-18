@@ -21,6 +21,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Нужен для камеры (регистрация: фото документа/селфи; завершение
+             сессии: фото места) — TakePicturePreview() без выходного Uri
+             оказался ненадёжным (камера не открывается на части устройств),
+             TakePicture() с FileProvider-Uri — официально рекомендуемый и
+             реально рабочий способ. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

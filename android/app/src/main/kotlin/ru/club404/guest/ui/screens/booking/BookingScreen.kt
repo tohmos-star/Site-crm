@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -30,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ru.club404.guest.data.Booking
@@ -73,89 +75,118 @@ fun BookingScreen(onOpenBalance: () -> Unit) {
     ) {
         SectionKicker("club.booking")
         Text("Забронировать место", style = MaterialTheme.typography.titleLarge)
-        Text(
-            "Выберите место, затем время. Оплата сразу с баланса, ПК включится сам за 5 минут до начала.",
-            color = TextMuted, style = MaterialTheme.typography.bodyMedium,
-        )
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Баланс: ${formatMoney(state.guestBalance)}", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
-            TextButton(onClick = onOpenBalance) { Text("Пополнить") }
+        InfoCard {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    Text("Баланс", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                    Text(formatMoney(state.guestBalance), style = MaterialTheme.typography.titleMedium)
+                }
+                TextButton(onClick = onOpenBalance) { Text("Пополнить") }
+            }
         }
 
-        Text("1. Место", style = MaterialTheme.typography.titleMedium)
-        // Всего 6 станций в моке — обычный Column/Row из чанков по 3, без Lazy*
-        // и без ручного подсчёта высоты, который понадобился бы для LazyVerticalGrid
-        // внутри уже прокручиваемой колонки.
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            state.stations.chunked(3).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    row.forEach { station ->
-                        StationCell(
-                            label = station.label,
-                            room = roomLabels[station.room] ?: station.room,
-                            tariffPerHour = station.tariffPerHour,
-                            selected = station.id == state.selectedStationId,
-                            onClick = { viewModel.selectStation(station.id) },
-                            modifier = Modifier.weight(1f),
-                        )
+        InfoCard {
+            SectionLabel("1. Место")
+            Text(
+                "Оплата сразу с баланса, ПК включится сам за 5 минут до начала.",
+                color = TextMuted, style = MaterialTheme.typography.bodyMedium,
+            )
+            // Всего 6 станций в моке — обычный Column/Row из чанков по 3, без Lazy*
+            // и без ручного подсчёта высоты, который понадобился бы для LazyVerticalGrid
+            // внутри уже прокручиваемой колонки.
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                state.stations.chunked(3).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        row.forEach { station ->
+                            StationCell(
+                                label = station.label,
+                                room = roomLabels[station.room] ?: station.room,
+                                tariffPerHour = station.tariffPerHour,
+                                selected = station.id == state.selectedStationId,
+                                onClick = { viewModel.selectStation(station.id) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
                 }
             }
         }
 
         if (state.selectedStationId != null) {
-            HorizontalDivider()
-            Text("2. Время", style = MaterialTheme.typography.titleMedium)
+            InfoCard {
+                SectionLabel("2. Время")
 
-            OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(state.startAt?.let { formatDateTime(it) } ?: "Выбрать дату и время")
-            }
-
-            Text("Длительность", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                durationPresets.forEach { (minutes, label) ->
-                    FilterChip(
-                        selected = minutes == state.durationMinutes,
-                        onClick = { viewModel.setDurationMinutes(minutes) },
-                        label = { Text(label) },
+                OutlinedButton(
+                    onClick = { showDatePicker = true },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                ) {
+                    Text(
+                        state.startAt?.let { formatDateTime(it) } ?: "Выбрать дату и время",
+                        style = MaterialTheme.typography.bodyLarge,
                     )
                 }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = { viewModel.setDurationMinutes(state.durationMinutes - DURATION_STEP_MINUTES) }) { Text("−") }
-                Text("${state.durationMinutes} мин", modifier = Modifier.padding(horizontal = 8.dp))
-                OutlinedButton(onClick = { viewModel.setDurationMinutes(state.durationMinutes + DURATION_STEP_MINUTES) }) { Text("+") }
-            }
 
-            state.quote?.let { quote ->
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Итого", style = MaterialTheme.typography.bodyMedium)
-                    Text(formatMoney(quote.amountRub), style = MaterialTheme.typography.titleMedium)
+                Text("Длительность", color = TextMuted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    durationPresets.forEach { (minutes, label) ->
+                        FilterChip(
+                            selected = minutes == state.durationMinutes,
+                            onClick = { viewModel.setDurationMinutes(minutes) },
+                            label = { Text(label) },
+                        )
+                    }
                 }
-                if (quote.discountPercent > 0) {
-                    Text("Скидка по лояльности: ${quote.discountPercent}%", color = Ok, style = MaterialTheme.typography.bodyMedium)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                ) {
+                    OutlinedButton(onClick = { viewModel.setDurationMinutes(state.durationMinutes - DURATION_STEP_MINUTES) }) { Text("−") }
+                    Text(
+                        "${state.durationMinutes} мин",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                    )
+                    OutlinedButton(onClick = { viewModel.setDurationMinutes(state.durationMinutes + DURATION_STEP_MINUTES) }) { Text("+") }
                 }
-            }
 
-            state.error?.let { StatusBanner(it, StatusKind.ERROR) }
+                state.quote?.let { quote ->
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Итого", style = MaterialTheme.typography.bodyMedium)
+                        Text(formatMoney(quote.amountRub), style = MaterialTheme.typography.titleMedium)
+                    }
+                    if (quote.discountPercent > 0) {
+                        Text("Скидка по лояльности: ${quote.discountPercent}%", color = Ok, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
 
-            Button(onClick = viewModel::confirmBooking, enabled = !state.loading, modifier = Modifier.fillMaxWidth()) {
-                Text(if (state.loading) "Бронируем…" else "Забронировать и оплатить")
+                state.error?.let { StatusBanner(it, StatusKind.ERROR) }
+
+                Button(
+                    onClick = viewModel::confirmBooking,
+                    enabled = !state.loading,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                ) {
+                    Text(if (state.loading) "Бронируем…" else "Забронировать и оплатить")
+                }
             }
         }
 
-        HorizontalDivider()
-        Text("Мои брони", style = MaterialTheme.typography.titleMedium)
-        if (state.myBookings.isEmpty()) {
-            Text("Пока нет предстоящих броней.", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
-        }
-        state.myBookings.forEach { booking ->
-            MyBookingRow(
-                booking = booking,
-                stationLabel = state.stations.firstOrNull { it.id == booking.stationId }?.label ?: "—",
-                onCancel = { viewModel.cancelBooking(booking.id) },
-            )
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionLabel("Мои брони")
+            if (state.myBookings.isEmpty()) {
+                Text("Пока нет предстоящих броней.", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+            }
+            state.myBookings.forEach { booking ->
+                MyBookingRow(
+                    booking = booking,
+                    stationLabel = state.stations.firstOrNull { it.id == booking.stationId }?.label ?: "—",
+                    onCancel = { viewModel.cancelBooking(booking.id) },
+                )
+            }
         }
     }
 
@@ -195,6 +226,11 @@ fun BookingScreen(onOpenBalance: () -> Unit) {
             TimePicker(state = timePickerState)
         }
     }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(text, style = MaterialTheme.typography.titleMedium)
 }
 
 @Composable

@@ -1,7 +1,5 @@
 package ru.club404.guest.ui.screens.register
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import ru.club404.guest.ui.components.InfoCard
 import ru.club404.guest.ui.components.PhotoCaptureBox
 import ru.club404.guest.ui.components.SectionKicker
+import ru.club404.guest.ui.components.rememberCameraCaptureLauncher
 import ru.club404.guest.ui.components.StatusBanner
 import ru.club404.guest.ui.components.StatusKind
 import ru.club404.guest.ui.theme.Accent
@@ -148,26 +147,22 @@ private fun FioStep(state: RegisterUiState, viewModel: RegisterViewModel) {
 
 @Composable
 private fun DocPhotoStep(state: RegisterUiState, viewModel: RegisterViewModel) {
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-        if (bitmap != null) viewModel.onDocPhotoTaken(bitmap)
-    }
+    val takePhoto = rememberCameraCaptureLauncher(viewModel::onDocPhotoTaken)
     StepProgress("Шаг 4 из 5 — самый важный")
     Text(
         "Нужна фотография документа с фото и ФИО — подойдёт паспорт (главный разворот), водительское удостоверение или загранпаспорт.",
         color = TextMuted, style = MaterialTheme.typography.bodyMedium,
     )
-    PhotoCaptureBox(bitmap = state.docPhoto, placeholder = "Нажмите, чтобы сфотографировать документ", onClick = { launcher.launch(null) })
+    PhotoCaptureBox(bitmap = state.docPhoto, placeholder = "Нажмите, чтобы сфотографировать документ", onClick = takePhoto)
     Button(onClick = viewModel::submitDocPhoto, enabled = state.docPhoto != null, modifier = Modifier.fillMaxWidth()) { Text("Далее") }
 }
 
 @Composable
 private fun SelfieStep(state: RegisterUiState, viewModel: RegisterViewModel) {
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-        if (bitmap != null) viewModel.onSelfiePhotoTaken(bitmap)
-    }
+    val takePhoto = rememberCameraCaptureLauncher(viewModel::onSelfiePhotoTaken)
     StepProgress("Шаг 5 из 5 — последний!")
     Text("Фото своего лица — сверим с документом, и всё, вы в системе.", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
-    PhotoCaptureBox(bitmap = state.selfiePhoto, placeholder = "Нажмите, чтобы сделать селфи", onClick = { launcher.launch(null) })
+    PhotoCaptureBox(bitmap = state.selfiePhoto, placeholder = "Нажмите, чтобы сделать селфи", onClick = takePhoto)
     state.error?.let { StatusBanner(it, StatusKind.ERROR) }
     Button(
         onClick = viewModel::submitRegistration,

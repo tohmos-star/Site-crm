@@ -8,21 +8,25 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.launch
 import ru.club404.guest.data.Booking
+import ru.club404.guest.data.BookingQuote
 import ru.club404.guest.data.DoorCodeInfo
 import ru.club404.guest.data.Station
 import ru.club404.guest.data.endAt
@@ -32,12 +36,20 @@ import ru.club404.guest.ui.components.InfoCard
 import ru.club404.guest.ui.components.StatusBanner
 import ru.club404.guest.ui.components.StatusKind
 import ru.club404.guest.ui.rememberGuestRepository
+import ru.club404.guest.ui.screens.booking.durationPresets
+import ru.club404.guest.ui.screens.booking.roomLabels
 import ru.club404.guest.ui.theme.Ok
 import ru.club404.guest.ui.theme.TextMuted
 
 // Гостевой аналог frontend/pc-widget.html прямо в приложении — те же 4 действия,
 // что попросили перенести, минус "Перезагрузить" (это действие имеет смысл
 // только с самой станции, не с телефона гостя).
+//
+// "Начать сессию" — сценарий 1 (гость без брони): выбор свободного места
+// прямо сейчас, без ввода кода — телефон тут и есть виджет. Сценарий 2
+// (гость с бронью) сюда не подмешан: код по-прежнему вводится на самой
+// станции (redeemCode() в GuestRepository существует для этого, но не
+// вызывается из UI приложения — см. android/README.md).
 @Composable
 fun SessionWidget(
     guestBalance: Int,
@@ -50,11 +62,8 @@ fun SessionWidget(
     onOpenSupport: () -> Unit,
     onOpenEndSession: () -> Unit,
 ) {
-    val repository = rememberGuestRepository()
-    val scope = rememberCoroutineScope()
-    var actionError by remember { mutableStateOf<String?>(null) }
-    var actionLoading by remember { mutableStateOf(false) }
     var showExtendDialog by remember { mutableStateOf(false) }
+    var showWalkInDialog by remember { mutableStateOf(false) }
 
     InfoCard {
         when {
@@ -72,45 +81,26 @@ fun SessionWidget(
                 Text("Ближайшая бронь", color = TextMuted, style = MaterialTheme.typography.labelLarge)
                 Text("Место: ${nextStation?.label ?: "—"}", style = MaterialTheme.typography.bodyMedium)
                 Text(formatDateTime(nextBooking.startAt), color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                Text("Код от неё вводится на самой станции при приходе.", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
             }
             else -> {
                 Text("Активной сессии и броней нет", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
             }
         }
 
-        actionError?.let { StatusBanner(it, StatusKind.ERROR, modifier = Modifier.padding(top = 6.dp)) }
-
         Spacer(Modifier.height(6.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             if (activeBooking != null) {
-                Button(
-                    onClick = { showExtendDialog = true },
-                    enabled = !actionLoading,
-                    modifier = Modifier.weight(1f),
-                ) { Text("Продлить") }
+                Button(onClick = { showExtendDialog = true }, modifier = Modifier.weight(1f)) { Text("Продлить") }
             } else {
-                Button(
-                    onClick = {
-                        if (nextBooking != null) {
-                            actionLoading = true
-                            actionError = null
-                            scope.launch {
-                                val result = repository.redeemCode(nextBooking.code)
-                                actionLoading = false
-                                result.onFailure { e -> actionError = e.message }
-                            }
-                        }
-                    },
-                    enabled = nextBooking != null && !actionLoading,
-                    modifier = Modifier.weight(1f),
-                ) { Text("Начать сессию") }
+                Button(onClick = { showWalkInDialog = true }, modifier = Modifier.weight(1f)) { Text("Начать сессию") }
             }
-            OutlinedButton(onClick = onOpenBalance, modifier = Modifier.weight(1f)) { Text("Пополнить баланс") }
+            OutlinedButton(onClick = onOpenBalance, modifier = Modifier.weight(1f)) { Text("Баланс") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            OutlinedButton(onClick = onOpenEndSession, enabled = activeBooking != null, modifier = Modifier.weight(1f)) { Text("Закончить сессию") }
-            OutlinedButton(onClick = onOpenSupport, modifier = Modifier.weight(1f)) { Text("Тех.поддержка") }
+            OutlinedButton(onClick = onOpenEndSession, enabled = activeBooking != null, modifier = Modifier.weight(1f)) { Text("Завершить") }
+            OutlinedButton(onClick = onOpenSupport, modifier = Modifier.weight(1f)) { Text("Поддержка") }
         }
     }
 
@@ -119,17 +109,11 @@ fun SessionWidget(
             guestBalance = guestBalance,
             hourlyTariff = activeStation.tariffPerHour,
             onDismiss = { showExtendDialog = false },
-            onConfirm = { minutes, price ->
-                actionLoading = true
-                actionError = null
-                scope.launch {
-                    val result = repository.extendActiveSession(minutes, price)
-                    actionLoading = false
-                    result.onFailure { e -> actionError = e.message }
-                    showExtendDialog = false
-                }
-            },
         )
+    }
+
+    if (showWalkInDialog) {
+        WalkInDialog(onDismiss = { showWalkInDialog = false })
     }
 }
 
@@ -149,10 +133,23 @@ private fun ExtendSessionDialog(
     guestBalance: Int,
     hourlyTariff: Int,
     onDismiss: () -> Unit,
-    onConfirm: (minutes: Int, priceRub: Int) -> Unit,
 ) {
+    val repository = rememberGuestRepository()
+    val scope = rememberCoroutineScope()
     var stepMinutes by remember { mutableStateOf(30) }
+    var loading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
     val stepPrice = Math.round(hourlyTariff * (stepMinutes / 60f))
+
+    fun confirm(minutes: Int, priceRub: Int) {
+        loading = true
+        error = null
+        scope.launch {
+            val result = repository.extendActiveSession(minutes, priceRub)
+            loading = false
+            result.fold(onSuccess = { onDismiss() }, onFailure = { e -> error = e.message })
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         InfoCard {
@@ -164,8 +161,8 @@ private fun ExtendSessionDialog(
                 packagesFor(hourlyTariff).forEach { pkg ->
                     val affordable = guestBalance >= pkg.priceRub
                     OutlinedButton(
-                        onClick = { onConfirm(pkg.minutes, pkg.priceRub) },
-                        enabled = affordable,
+                        onClick = { confirm(pkg.minutes, pkg.priceRub) },
+                        enabled = affordable && !loading,
                         modifier = Modifier.weight(1f),
                     ) {
                         Column {
@@ -185,11 +182,96 @@ private fun ExtendSessionDialog(
                 }
                 OutlinedButton(onClick = { stepMinutes += EXTEND_STEP_MINUTES }) { Text("+") }
             }
+
+            error?.let { StatusBanner(it, StatusKind.ERROR) }
+
             Button(
-                onClick = { onConfirm(stepMinutes, stepPrice) },
-                enabled = guestBalance >= stepPrice,
+                onClick = { confirm(stepMinutes, stepPrice) },
+                enabled = guestBalance >= stepPrice && !loading,
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-            ) { Text("Продлить на $stepMinutes мин") }
+            ) { Text(if (loading) "Продлеваем…" else "Продлить на $stepMinutes мин") }
+
+            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Отмена") }
+        }
+    }
+}
+
+@Composable
+private fun WalkInDialog(onDismiss: () -> Unit) {
+    val repository = rememberGuestRepository()
+    val scope = rememberCoroutineScope()
+    val freeStations = remember { repository.freeStationsNow() }
+    var selectedStationId by remember { mutableStateOf(freeStations.firstOrNull()?.id) }
+    var minutes by remember { mutableStateOf(60) }
+    var quote by remember { mutableStateOf<BookingQuote?>(null) }
+    var loading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(selectedStationId, minutes) {
+        val stationId = selectedStationId
+        quote = if (stationId != null) repository.quoteBooking(stationId, minutes) else null
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        InfoCard {
+            Text("Начать сессию сейчас", style = MaterialTheme.typography.titleMedium)
+
+            if (freeStations.isEmpty()) {
+                Text("Сейчас нет свободных мест.", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+            } else {
+                Text("Место", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    freeStations.chunked(3).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                            row.forEach { station ->
+                                FilterChip(
+                                    selected = station.id == selectedStationId,
+                                    onClick = { selectedStationId = station.id },
+                                    label = { Text(roomLabels[station.room] ?: station.label, style = MaterialTheme.typography.bodyMedium) },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Text("Длительность", color = TextMuted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    durationPresets.forEach { (presetMinutes, label) ->
+                        FilterChip(selected = minutes == presetMinutes, onClick = { minutes = presetMinutes }, label = { Text(label) })
+                    }
+                }
+
+                quote?.let { q ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Стоимость", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                        Text(formatMoney(q.amountRub), style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+
+                error?.let { StatusBanner(it, StatusKind.ERROR) }
+
+                Button(
+                    onClick = {
+                        val stationId = selectedStationId
+                        if (stationId != null) {
+                            loading = true
+                            error = null
+                            scope.launch {
+                                val result = repository.startWalkInSession(stationId, minutes)
+                                loading = false
+                                result.fold(onSuccess = { onDismiss() }, onFailure = { e -> error = e.message })
+                            }
+                        }
+                    },
+                    enabled = selectedStationId != null && !loading,
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                ) { Text(if (loading) "Запускаем…" else "Начать") }
+            }
 
             TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Отмена") }
         }

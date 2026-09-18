@@ -36,7 +36,22 @@ interface GuestRepository {
     suspend fun quoteBooking(stationId: String, minutes: Int): BookingQuote
     suspend fun createBooking(stationId: String, startAt: Instant, minutes: Int): Result<Booking>
     suspend fun cancelBooking(bookingId: String): Result<Unit>
+
+    // Редактирование брони кодом на самой станции (см. frontend/pc-widget.html
+    // и backend/src/routes/pcAgent.ts) — это действие принадлежит станции, не
+    // телефону гостя, поэтому в UI приложения никакой экран его не вызывает
+    // (см. android/README.md). Метод остаётся в интерфейсе как контракт
+    // станции-виджета на будущее — не мёртвый код, а нереализованная в этом
+    // приложении сторона интеграции.
     suspend fun redeemCode(code: String): Result<Booking>
+
+    // Сценарий 1 (гость пришёл без брони, сел за свободный ПК): выбирает
+    // место и стартует сессию прямо из приложения — никакого кода вводить не
+    // нужно, телефон гостя тут и есть тот "виджет". Сценарий 2 (гость
+    // бронировал заранее): код по-прежнему вводится на самой станции,
+    // redeemCode() выше — этот метод его не подменяет.
+    fun freeStationsNow(): List<Station>
+    suspend fun startWalkInSession(stationId: String, minutes: Int): Result<Booking>
 
     // Продление активной сессии со станции-виджета в приложении — те же
     // правила, что в frontend/pc-widget.html: цена считается по flat
