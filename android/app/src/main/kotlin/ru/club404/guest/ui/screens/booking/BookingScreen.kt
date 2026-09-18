@@ -1,28 +1,31 @@
 package ru.club404.guest.ui.screens.booking
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material3.Button
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -31,9 +34,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import ru.club404.guest.data.Booking
 import ru.club404.guest.data.formatDateTime
 import ru.club404.guest.data.formatMoney
@@ -42,15 +46,18 @@ import ru.club404.guest.ui.components.SectionKicker
 import ru.club404.guest.ui.components.StatusBanner
 import ru.club404.guest.ui.components.StatusKind
 import ru.club404.guest.ui.theme.Accent
+import ru.club404.guest.ui.theme.BorderColor
 import ru.club404.guest.ui.theme.Ok
+import ru.club404.guest.ui.theme.PanelRaised
 import ru.club404.guest.ui.theme.TextMuted
+import ru.club404.guest.ui.theme.TextPrimary
+import ru.club404.guest.ui.theme.hexColor
 import ru.club404.guest.ui.viewModelWithRepo
-import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookingScreen(onOpenBalance: () -> Unit) {
     val viewModel = viewModelWithRepo(::BookingViewModel)
@@ -62,9 +69,13 @@ fun BookingScreen(onOpenBalance: () -> Unit) {
         return
     }
 
-    var showDatePicker by remember { mutableStateOf(false) }
-    var showTimePicker by remember { mutableStateOf(false) }
-    var pickedDate by remember { mutableStateOf<LocalDate?>(null) }
+    // Своя лента дат + сетка часов вместо системных DatePicker/TimePicker —
+    // крупнее, без диалогов поверх экрана, в стиле карточек LANGAME.
+    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var selectedHour by remember { mutableStateOf<Int?>(null) }
+
+    fun zoneColorFor(zoneId: String): Color =
+        state.zones.firstOrNull { it.id == zoneId }?.colorHex?.let(::hexColor) ?: Accent
 
     Column(
         modifier = Modifier
@@ -92,21 +103,23 @@ fun BookingScreen(onOpenBalance: () -> Unit) {
                 "Оплата сразу с баланса, ПК включится сам за 5 минут до начала.",
                 color = TextMuted, style = MaterialTheme.typography.bodyMedium,
             )
-            // Всего 6 станций в моке — обычный Column/Row из чанков по 3, без Lazy*
-            // и без ручного подсчёта высоты, который понадобился бы для LazyVerticalGrid
-            // внутри уже прокручиваемой колонки.
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                state.stations.chunked(3).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        row.forEach { station ->
-                            StationCell(
-                                label = station.label,
-                                room = roomLabels[station.room] ?: station.room,
-                                tariffPerHour = station.tariffPerHour,
-                                selected = station.id == state.selectedStationId,
-                                onClick = { viewModel.selectStation(station.id) },
-                                modifier = Modifier.weight(1f),
-                            )
+            // Графическая карта по комнатам вместо плоской сетки кнопок —
+            // цвет места берётся из Zone.colorHex, как на сайте.
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                state.stations.groupBy { it.room }.forEach { (room, seats) ->
+                    val zoneColor = zoneColorFor(seats.first().zoneId)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        RoomHeader(roomLabels[room] ?: room, zoneColor)
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            seats.forEach { station ->
+                                SeatTile(
+                                    label = "Место ${station.seat}",
+                                    tariffPerHour = station.tariffPerHour,
+                                    zoneColor = zoneColor,
+                                    selected = station.id == state.selectedStationId,
+                                    onClick = { viewModel.selectStation(station.id) },
+                                )
+                            }
                         }
                     }
                 }
@@ -117,23 +130,55 @@ fun BookingScreen(onOpenBalance: () -> Unit) {
             InfoCard {
                 SectionLabel("2. Время")
 
-                OutlinedButton(
-                    onClick = { showDatePicker = true },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                Text("Дата", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(
-                        state.startAt?.let { formatDateTime(it) } ?: "Выбрать дату и время",
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
+                    (0..6).forEach { offset ->
+                        val date = LocalDate.now().plusDays(offset.toLong())
+                        DateChip(
+                            date = date,
+                            selected = date == selectedDate,
+                            onClick = { selectedDate = date; selectedHour = null },
+                        )
+                    }
+                }
+
+                Text("Время", color = TextMuted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+                val availableHours = availableHoursFor(selectedDate)
+                if (availableHours.isEmpty()) {
+                    Text("На сегодня свободных часов не осталось — выберите другой день.", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        availableHours.chunked(4).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                row.forEach { hour ->
+                                    TimeSlotChip(
+                                        hour = hour,
+                                        selected = hour == selectedHour,
+                                        onClick = {
+                                            selectedHour = hour
+                                            viewModel.setStartAt(
+                                                selectedDate.atTime(hour, 0).atZone(ZoneId.systemDefault()).toInstant(),
+                                            )
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Text("Длительность", color = TextMuted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     durationPresets.forEach { (minutes, label) ->
-                        FilterChip(
+                        DurationChip(
+                            label = label,
                             selected = minutes == state.durationMinutes,
                             onClick = { viewModel.setDurationMinutes(minutes) },
-                            label = { Text(label) },
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
@@ -167,7 +212,7 @@ fun BookingScreen(onOpenBalance: () -> Unit) {
 
                 Button(
                     onClick = viewModel::confirmBooking,
-                    enabled = !state.loading,
+                    enabled = !state.loading && state.startAt != null,
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                 ) {
                     Text(if (state.loading) "Бронируем…" else "Забронировать и оплатить")
@@ -189,42 +234,15 @@ fun BookingScreen(onOpenBalance: () -> Unit) {
             }
         }
     }
+}
 
-    if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    val millis = datePickerState.selectedDateMillis
-                    if (millis != null) {
-                        pickedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate()
-                    }
-                    showDatePicker = false
-                    showTimePicker = true
-                }) { Text("Далее") }
-            },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Отмена") } },
-        ) {
-            DatePicker(state = datePickerState)
-        }
-    }
-
-    if (showTimePicker) {
-        val timePickerState = rememberTimePickerState(initialHour = 12, initialMinute = 0, is24Hour = true)
-        TimePickerDialog(
-            onDismiss = { showTimePicker = false },
-            onConfirm = {
-                val date = pickedDate
-                if (date != null) {
-                    val localDateTime = date.atTime(LocalTime.of(timePickerState.hour, timePickerState.minute))
-                    viewModel.setStartAt(localDateTime.atZone(ZoneId.systemDefault()).toInstant())
-                }
-                showTimePicker = false
-            },
-        ) {
-            TimePicker(state = timePickerState)
-        }
+// Бронь минимум за 5 минут от текущего момента (правило подтверждается в
+// BookingViewModel.confirmBooking) — на сегодня прошлые и ближайшие 5 минут
+// просто не показываем как варианты.
+private fun availableHoursFor(date: LocalDate): List<Int> {
+    val now = java.time.LocalDateTime.now()
+    return (0..23).filter { hour ->
+        date != LocalDate.now() || date.atTime(hour, 0).isAfter(now.plusMinutes(5))
     }
 }
 
@@ -234,25 +252,93 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
-private fun StationCell(
+private fun RoomHeader(label: String, zoneColor: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.size(10.dp).clip(CircleShape).background(zoneColor))
+        Text(label, style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+@Composable
+private fun SeatTile(
     label: String,
-    room: String,
     tariffPerHour: Int,
+    zoneColor: Color,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .width(96.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (selected) zoneColor.copy(alpha = 0.18f) else PanelRaised)
+            .border(if (selected) 2.dp else 1.dp, if (selected) zoneColor else BorderColor, RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(Icons.Filled.DesktopWindows, contentDescription = null, tint = zoneColor)
+        Text(label, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
+        Text("$tariffPerHour ₽/ч", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun DateChip(date: LocalDate, selected: Boolean, onClick: () -> Unit) {
+    val today = LocalDate.now()
+    val topLabel = when (date) {
+        today -> "Сегодня"
+        today.plusDays(1) -> "Завтра"
+        else -> date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, Locale("ru")).replaceFirstChar { it.uppercase() }
+    }
+    PillTile(
+        topLabel = topLabel,
+        bottomLabel = date.format(DateTimeFormatter.ofPattern("dd.MM")),
+        selected = selected,
+        onClick = onClick,
+        modifier = Modifier.width(76.dp),
+    )
+}
+
+@Composable
+private fun TimeSlotChip(hour: Int, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    PillTile(
+        topLabel = "%02d:00".format(hour),
+        bottomLabel = null,
+        selected = selected,
+        onClick = onClick,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun DurationChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    PillTile(topLabel = label, bottomLabel = null, selected = selected, onClick = onClick, modifier = modifier)
+}
+
+@Composable
+private fun PillTile(
+    topLabel: String,
+    bottomLabel: String?,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                Text(label, style = MaterialTheme.typography.bodyMedium)
-                Text("$room · $tariffPerHour ₽/ч", color = TextMuted, style = MaterialTheme.typography.bodyMedium)
-            }
-        },
-        modifier = modifier,
-    )
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) Accent.copy(alpha = 0.18f) else PanelRaised)
+            .border(if (selected) 2.dp else 1.dp, if (selected) Accent else BorderColor, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(topLabel, color = if (selected) Accent else TextPrimary, style = MaterialTheme.typography.bodyMedium)
+        if (bottomLabel != null) {
+            Text(bottomLabel, color = TextMuted, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
 }
 
 @Composable
@@ -289,25 +375,6 @@ private fun MyBookingRow(booking: Booking, stationLabel: String, onCancel: () ->
                 )
             }
             TextButton(onClick = onCancel) { Text("Отменить") }
-        }
-    }
-}
-
-@Composable
-private fun TimePickerDialog(
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-    content: @Composable () -> Unit,
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = MaterialTheme.shapes.extraLarge) {
-            Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                content()
-                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                    TextButton(onClick = onDismiss) { Text("Отмена") }
-                    TextButton(onClick = onConfirm) { Text("ОК") }
-                }
-            }
         }
     }
 }

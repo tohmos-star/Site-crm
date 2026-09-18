@@ -13,6 +13,7 @@ import ru.club404.guest.data.BookingQuote
 import ru.club404.guest.data.BookingStatus
 import ru.club404.guest.data.GuestRepository
 import ru.club404.guest.data.Station
+import ru.club404.guest.data.Zone
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -26,6 +27,7 @@ const val MIN_DURATION_MINUTES = 10
 
 data class BookingUiState(
     val stations: List<Station> = emptyList(),
+    val zones: List<Zone> = emptyList(),
     val guestBalance: Int = 0,
     val selectedStationId: String? = null,
     val startAt: Instant? = null,
@@ -39,7 +41,7 @@ data class BookingUiState(
 
 class BookingViewModel(private val repository: GuestRepository) : ViewModel() {
 
-    private val _state = MutableStateFlow(BookingUiState(stations = repository.stations))
+    private val _state = MutableStateFlow(BookingUiState(stations = repository.stations, zones = repository.zones))
     val state: StateFlow<BookingUiState> = _state.asStateFlow()
 
     init {
