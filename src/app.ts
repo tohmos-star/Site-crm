@@ -57,6 +57,16 @@ export async function buildApp() {
     decorateReply: false,
   });
 
+  // Сам сайт (frontend/) — статика на корне. Реальные страницы уже
+  // используют относительные от корня пути (/login.html, /js/layout.js,
+  // /css/main.css) — раздаём как есть, роутер отдаёт /api и /uploads в
+  // приоритете перед статическим fallback'ом.
+  await app.register(fastifyStatic, {
+    root: path.resolve(process.cwd(), "frontend"),
+    prefix: "/",
+    decorateReply: false,
+  });
+
   app.get("/health", async () => ({ ok: true }));
 
   // Публичное + auth (регистрация/логин гостя и админа, entry-access,
