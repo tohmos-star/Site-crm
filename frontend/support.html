@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Тех.поддержка — 404</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body data-page="support">
+  <div id="site-header"></div>
+  <main>
+    <section class="hero" style="padding-bottom:32px;">
+      <div class="wrap">
+        <p class="kicker">club.support</p>
+        <h1 style="max-width:16ch;">Добро пожаловать в Тех.поддержку</h1>
+        <p class="lead">Опишите проблему. Важно: 90% проблем решаются перезагрузкой компьютера — пишите сюда, если не помогло.</p>
+      </div>
+    </section>
+
+    <section class="block" style="padding-top:0;">
+      <div class="wrap">
+        <div class="form-panel">
+          <form id="supportForm">
+            <div class="field">
+              <label for="s-topic">Тема</label>
+              <select id="s-topic">
+                <option>Не открывается дверь / доступ</option>
+                <option>Проблема с ПК или периферией</option>
+                <option>Оплата и баланс</option>
+                <option>Другое</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="s-message">Сообщение</label>
+              <textarea id="s-message" rows="5" required></textarea>
+            </div>
+            <div class="field">
+              <label for="s-phone">Телефон для связи</label>
+              <input type="tel" id="s-phone" placeholder="+7 900 000-00-00" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">
+              Отправить
+            </button>
+            <div class="status-msg" id="supportStatus"></div>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+  <div id="site-footer"></div>
+  <script src="/js/layout.js"></script>
+  <script>
+    document.getElementById('supportForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const statusEl = document.getElementById('supportStatus');
+      const btn = e.target.querySelector('button');
+      btn.disabled = true;
+      btn.textContent = 'Отправка…';
+      try {
+        const res = await fetch('/api/support-tickets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic: document.getElementById('s-topic').value,
+            message: document.getElementById('s-message').value,
+            phone: document.getElementById('s-phone').value,
+          }),
+        });
+        if (!res.ok) throw new Error();
+        statusEl.textContent = 'Вопрос отправлен. С 9:00 до 23:00 отвечаем обычно за 10 минут, ночью — до часа. Если не ответим за час — звоните 8 (908) 404-04-40.';
+        statusEl.className = 'status-msg show ok';
+        btn.textContent = 'Отправлено';
+      } catch {
+        statusEl.textContent = 'Не удалось отправить. Попробуйте ещё раз.';
+        statusEl.className = 'status-msg show err';
+        btn.disabled = false;
+        btn.textContent = 'Отправить';
+      }
+    });
+  </script>
+</body>
+</html>

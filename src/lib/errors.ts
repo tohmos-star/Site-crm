@@ -36,3 +36,15 @@ export class PricingGapError extends DomainError {
     );
   }
 }
+
+export class UnauthorizedError extends DomainError {
+  constructor(message = "Authentication required") {
+    super("UNAUTHORIZED", message, 401);
+  }
+}
+
+export class ForbiddenError extends DomainError {
+  constructor(message = "Not allowed") {
+    super("FORBIDDEN", message, 403);
+  }
+}

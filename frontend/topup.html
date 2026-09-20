@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Пополнить баланс — 404</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .amount-chips { display: flex; gap: 8px; margin-bottom: 14px; }
+    .amount-chips button {
+      flex: 1; padding: 10px 0; border-radius: 7px; border: 1px solid var(--border);
+      background: transparent; color: var(--text); font-size: 13px; cursor: pointer;
+    }
+    .amount-chips button:hover { border-color: var(--accent); }
+    .qr-box {
+      width: 148px; height: 148px; border-radius: 10px; background: #fff;
+      display: flex; align-items: center; justify-content: center; margin: 4px auto; font-size: 60px;
+    }
+    .topup-ok { color: var(--ok); font-size: 14px; text-align: center; padding: 10px 0; }
+  </style>
+</head>
+<body data-page="topup">
+  <div id="site-header"></div>
+  <main>
+    <section class="hero" style="padding-bottom:24px;">
+      <div class="wrap">
+        <p class="kicker">club.topup</p>
+        <h1 style="max-width:16ch;">Пополнить баланс</h1>
+        <p class="lead">Тот же баланс списывается за бронь мест и за продление сессии прямо на станции.</p>
+      </div>
+    </section>
+
+    <section class="block" style="padding-top:0;">
+      <div class="wrap">
+        <div class="form-panel" id="topupPanel">
+          <p style="color:var(--text-muted); font-size:13px; margin:0 0 12px;">Баланс: <span id="balanceLine">—</span></p>
+
+          <div id="stepPick">
+            <div class="field">
+              <label for="amountInput">Сумма пополнения</label>
+              <input type="number" id="amountInput" value="300" min="50" step="50">
+            </div>
+            <div class="amount-chips">
+              <button type="button" data-add="100">+100 ₽</button>
+              <button type="button" data-add="500">+500 ₽</button>
+              <button type="button" data-add="1000">+1000 ₽</button>
+            </div>
+            <button class="btn btn-primary" id="payBtn" style="width:100%; justify-content:center;">Оплатить через СБП</button>
+            <div class="status-msg" id="topupStatus"></div>
+          </div>
+
+          <div id="stepWaiting" style="display:none; text-align:center;">
+            <div class="qr-box">▦</div>
+            <p id="waitingAmount" style="font-size:15px; font-weight:600; margin:6px 0 2px;"></p>
+            <p style="font-size:12.5px; color:var(--text-muted); margin:0 0 14px;">Ждём оплату…</p>
+            <button class="btn btn-ghost" id="devConfirmBtn" style="width:100%; justify-content:center;">Демо: платёж пришёл</button>
+          </div>
+
+          <div id="stepDone" style="display:none;">
+            <div class="topup-ok">✓ Баланс пополнен</div>
+            <button class="btn btn-ghost" id="topupAgainBtn" style="width:100%; justify-content:center;">Пополнить ещё</button>
+          </div>
+        </div>
+
+        <p style="max-width:520px; margin-top:16px;"><a href="/booking.html" style="color:var(--accent);">← Назад к брони</a></p>
+      </div>
+    </section>
+  </main>
+  <div id="site-footer"></div>
+
+  <script src="/js/layout.js"></script>
+  <script src="/js/topup.js"></script>
+</body>
+</html>

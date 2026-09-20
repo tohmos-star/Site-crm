@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Забронировать — 404</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .seat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .seat-btn {
+      padding: 12px 4px 10px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--panel-raised); color: var(--text); font-family: var(--font-mono);
+      font-size: 12px; cursor: pointer; text-align: center;
+    }
+    .seat-btn.selected { border-color: var(--accent); background: rgba(255,90,31,0.08); }
+    .seat-btn .room { display: block; color: var(--text-muted); font-size: 10px; margin-top: 2px; }
+    .booking-step2 { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 18px; }
+    .duration-chips { display: flex; gap: 8px; margin-bottom: 10px; }
+    .duration-chips button {
+      flex: 1; padding: 8px 0; border-radius: 7px; border: 1px solid var(--border);
+      background: transparent; color: var(--text); font-size: 13px; cursor: pointer;
+    }
+    .duration-chips button.active { border-color: var(--accent); color: var(--accent); }
+    .stepper { display: flex; align-items: center; gap: 10px; }
+    .stepper button { width: 36px; height: 36px; border-radius: 7px; border: 1px solid var(--border); background: transparent; color: var(--text); font-size: 16px; cursor: pointer; }
+    .stepper .val { flex: 1; text-align: center; font-family: var(--font-mono); font-size: 16px; }
+    .booking-price { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--border); padding-top: 14px; margin: 16px 0; }
+    .booking-price .amount { font-size: 22px; font-weight: 700; font-family: var(--font-mono); }
+    .booking-code { text-align: center; padding: 20px 0; }
+    .booking-code .digits { font-family: var(--font-mono); font-size: 40px; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); margin: 10px 0; }
+    .booking-item { display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; }
+    .booking-item .meta { font-size: 13px; color: var(--text-muted); }
+    .booking-item .code { font-family: var(--font-mono); color: var(--accent); }
+    .balance-line { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .section-kicker { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin: 0 0 10px; }
+  </style>
+</head>
+<body data-page="booking">
+  <div id="site-header"></div>
+  <main>
+    <section class="hero" style="padding-bottom:24px;">
+      <div class="wrap">
+        <p class="kicker">club.booking</p>
+        <h1 style="max-width:16ch;">Забронировать место</h1>
+        <p class="lead">Выберите место, затем время. Оплата сразу с баланса, бесплатная отмена — если до брони
+          больше суток. ПК включится сам за 5 минут до начала, код для входа получите сразу после оплаты.</p>
+      </div>
+    </section>
+
+    <section class="block" style="padding-top:0;">
+      <div class="wrap">
+
+        <div class="panel" style="max-width:560px;">
+          <div class="balance-line">
+            <span class="section-kicker" id="balanceLine" style="margin:0;">Баланс: —</span>
+            <a href="/topup.html" class="btn btn-ghost" style="padding:6px 12px; font-size:13px;">Пополнить</a>
+          </div>
+
+          <div id="stepStations">
+            <p class="section-kicker">1. Место</p>
+            <div class="seat-grid" id="stationGrid">Загрузка…</div>
+          </div>
+
+          <div class="booking-step2" id="stepDetails" style="display:none;">
+            <p class="section-kicker">2. Время — <span id="selectedLabel"></span></p>
+
+            <div class="field">
+              <label for="startAt">Дата и время</label>
+              <input type="datetime-local" id="startAt">
+            </div>
+
+            <div class="field">
+              <div class="duration-chips" id="durationChips">
+                <button type="button" data-minutes="60">1 час</button>
+                <button type="button" data-minutes="180">3 часа</button>
+                <button type="button" data-minutes="360">6 часов</button>
+              </div>
+              <div class="stepper">
+                <button type="button" id="minusMin">−</button>
+                <div class="val" id="minutesVal">60 мин</div>
+                <button type="button" id="plusMin">+</button>
+              </div>
+            </div>
+
+            <div class="booking-price">
+              <span>Итого</span>
+              <span class="amount" id="totalAmount">0 ₽</span>
+            </div>
+
+            <button class="btn btn-primary" id="submitBtn" style="width:100%; justify-content:center;">Забронировать и оплатить</button>
+            <div class="status-msg" id="formStatus"></div>
+          </div>
+
+          <div id="stepCode" style="display:none;">
+            <div class="booking-code">
+              <div style="color:var(--text-muted); font-size:13px;">Код для входа на ПК при приходе</div>
+              <div class="digits" id="codeDigits">------</div>
+              <div style="font-size:12px; color:var(--text-muted);">ПК включится сам за 5 минут до начала брони. Код действует до конца оплаченного времени.</div>
+            </div>
+            <button class="btn btn-ghost" id="bookAnotherBtn" style="width:100%; justify-content:center;">Забронировать ещё</button>
+          </div>
+        </div>
+
+        <div class="panel" style="max-width:560px; margin-top:20px;">
+          <p class="section-kicker">Мои брони</p>
+          <div id="myBookings">—</div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+  <div id="site-footer"></div>
+
+  <script src="/js/layout.js"></script>
+  <script src="/js/booking.js"></script>
+</body>
+</html>

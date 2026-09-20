@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Отчёт о завершении сессии — 404</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body data-page="report">
+  <div id="site-header"></div>
+
+  <main>
+    <section class="hero" style="padding-bottom:32px;">
+      <div class="wrap">
+        <p class="kicker">session.report · <span id="session-id">—</span></p>
+        <h1 style="max-width:20ch;">Отправь отчёт — получи бонус</h1>
+        <p class="lead">Отметь пункты и прикрепи 2–3 фото места. Это займёт меньше минуты
+          и закроет сессию с начислением баллов.</p>
+      </div>
+    </section>
+
+    <section class="block" style="padding-top:0;">
+      <div class="wrap">
+        <div class="form-panel" style="max-width:560px;">
+          <form id="reportForm">
+            <div class="checklist">
+              <label class="check-item">
+                <input type="checkbox" name="check_desk" required>
+                <span class="txt">Стол свободен<small>Кружки, обёртки и личные вещи убраны</small></span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="check_pc" required>
+                <span class="txt">ПК и периферия на месте<small>Клавиатура, мышь, коврик — там же, где были</small></span>
+              </label>
+              <label class="check-item">
+                <input type="checkbox" name="check_headset" required>
+                <span class="txt">Наушники на зарядке<small>Подключены к станции, не оставлены на столе</small></span>
+              </label>
+            </div>
+
+            <div class="field">
+              <label>Фото места (минимум 2)</label>
+              <div class="photo-grid">
+                <label class="photo-slot" id="slot-0">
+                  добавить фото
+                  <input type="file" accept="image/*" capture="environment" data-slot="0">
+                </label>
+                <label class="photo-slot" id="slot-1">
+                  добавить фото
+                  <input type="file" accept="image/*" capture="environment" data-slot="1">
+                </label>
+                <label class="photo-slot" id="slot-2">
+                  необязательно
+                  <input type="file" accept="image/*" capture="environment" data-slot="2">
+                </label>
+              </div>
+              <div class="hint">Снимок стола и зоны с ПК — этого достаточно.</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="submitBtn" style="width:100%; justify-content:center;">
+              Отправить отчёт
+            </button>
+
+            <div class="status-msg" id="formStatus"></div>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/layout.js"></script>
+  <script src="/js/report.js"></script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>О клубе — 404</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .slide-num { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-bottom: 8px; display: block; }
+    .spec-list { list-style: none; padding: 0; margin: 0; }
+    .spec-list li { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .spec-list li:last-child { border-bottom: none; }
+    .voice-cmd { font-family: var(--font-mono); font-size: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; }
+    .panel-media { padding: 0; overflow: hidden; }
+    .panel-media img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; }
+    .panel-media .panel-body { padding: 22px; }
+    .hero-media {
+      margin-top: 32px; border-radius: var(--radius); overflow: hidden;
+      border: 1px solid var(--border); max-width: 420px;
+    }
+    .hero-media img { width: 100%; display: block; }
+  </style>
+</head>
+<body data-page="club">
+  <div id="site-header"></div>
+
+  <main>
+    <section class="hero" style="padding-bottom:32px;">
+      <div class="wrap">
+        <p class="kicker">club.about · 404 cyber house</p>
+        <h1 style="max-width:16ch;">Первый клуб без администраторов</h1>
+        <p class="lead">Всё устроено так, чтобы вы ни разу не увидели администратора на входе — только умный клуб и полный контроль в своих руках.</p>
+        <div class="hero-media">
+          <img src="/assets/club/intro-no-admins.webp" alt="404 Киберхаус — первый клуб без администраторов" loading="lazy">
+        </div>
+      </div>
+    </section>
+
+    <section class="block" style="padding-top:0;">
+      <div class="wrap">
+        <div class="grid cols-2">
+
+          <div class="panel panel-media">
+            <img src="/assets/club/01-rooms.webp" alt="Приватные комнаты клуба" loading="lazy">
+            <div class="panel-body">
+              <span class="slide-num">01 · комнаты</span>
+              <h3>4 приватные комнаты</h3>
+              <p>Общего зала нет: DUO ROOM ×2 — для двоих игроков, SOLO ROOM ×2 — для одного, включая SOLO+ с расширенным оснащением.</p>
+            </div>
+          </div>
+
+          <div class="panel panel-media">
+            <img src="/assets/club/02-smart-home.webp" alt="Умный дом в комнате клуба" loading="lazy">
+            <div class="panel-body">
+              <span class="slide-num">02 · умный дом</span>
+              <h3>Полная автоматизация комнаты</h3>
+              <p>Система сама включает и выключает ПК, лампы, приточно-вытяжную систему и кондиционер. Управляйте голосом или доверьте всё сценариям — датчики температуры и движения сделают это за вас.</p>
+            </div>
+          </div>
+
+          <div class="panel panel-media">
+            <img src="/assets/club/03-equipment.webp" alt="Оснащение комнаты" loading="lazy">
+            <div class="panel-body">
+              <span class="slide-num">03 · оснащение</span>
+              <h3>В каждой комнате</h3>
+              <ul class="spec-list">
+                <li>Монитор 27″ 240Hz на кронштейне</li>
+                <li>Беспроводные клавиатура и мышь</li>
+                <li>Розетки для зарядки</li>
+                <li>Органайзер со спиртовыми салфетками</li>
+                <li>Игровое кресло</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="panel panel-media">
+            <img src="/assets/club/04-solo-plus.webp" alt="SOLO+ комната" loading="lazy">
+            <div class="panel-body">
+              <span class="slide-num">04 · solo+</span>
+              <h3>Премиальная комната</h3>
+              <p>Одна из SOLO-комнат — с расширенным оснащением: два монитора 27″ 240Hz, стол с электроприводом высоты, стримерская стойка для микрофона, кресло с вентилируемой спинкой.</p>
+            </div>
+          </div>
+
+          <div class="panel panel-media" id="hardware">
+            <img src="/assets/club/05-hardware.webp" alt="Железо: характеристики ПК" loading="lazy">
+            <div class="panel-body">
+              <span class="slide-num">05 · железо</span>
+              <h3>Технические характеристики</h3>
+              <ul class="spec-list">
+                <li>Процессор i5 12600KF</li>
+                <li>Видеокарта ASUS TUF RTX 3080 10Gb</li>
+                <li>Оперативная память DDR5 5600 32Gb</li>
+                <li>Монитор LG 27″ 240Hz</li>
+                <li>Наушники HyperX Cloud 2 (беспроводные)</li>
+                <li>Мышь DP R1 PRO Pixart 3395 (беспроводная)</li>
+                <li>Клавиатура AULA F75</li>
+                <li>Кресло Cougar Armor One</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="panel panel-media" id="room-control">
+            <img src="/assets/club/08-room-control.webp" alt="Управление комнатой через Алису" loading="lazy">
+            <div class="panel-body">
+              <span class="slide-num">06 · управление комнатой</span>
+              <h3>Голосом, через Алису</h3>
+              <div class="voice-cmd">Алиса, включите вытяжку</div>
+              <div class="voice-cmd">Алиса, включите освещение</div>
+              <div class="voice-cmd">Алиса, включите компьютеры</div>
+              <div class="voice-cmd">Алиса, включите кондиционер</div>
+              <p style="font-size:12px; color:var(--text-muted); margin:0;">Выключать тоже умеет.</p>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="panel panel-media" style="margin-top:16px; border-color: var(--accent);">
+          <img src="/assets/club/09-rules.webp" alt="Основные правила клуба" loading="lazy">
+          <div class="panel-body">
+            <span class="slide-num" style="color:var(--accent);">07 · правила клуба</span>
+            <h3>Основные правила</h3>
+            <ul class="spec-list">
+              <li>Посещение клуба возможно строго с 18 лет</li>
+              <li>Регистрация по документам, подтверждающим личность</li>
+              <li>Бронь ПК только через приложение LANGAME</li>
+            </ul>
+            <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
+              <a href="/register.html" class="btn btn-primary">Начать регистрацию</a>
+              <a href="https://langame.ru/club/799454628" target="_blank" rel="noopener" class="btn btn-ghost">Забронировать в LANGAME</a>
+            </div>
+          </div>
+        </div>
+
+        <p class="sub" style="margin-top:24px;">С любыми вопросами — в <a href="/support.html" style="color:var(--accent);">Тех.поддержку</a>.</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="site-footer"></div>
+  <script src="/js/layout.js"></script>
+</body>
+</html>

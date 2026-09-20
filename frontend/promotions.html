@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Акции — 404</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .promo-steps { margin: 0 0 16px; padding-left: 18px; font-size: 14px; color: var(--text-muted); }
+    .promo-steps li { margin-bottom: 6px; }
+    .promo-footnote { font-size: 12px; color: var(--text-muted); margin: 0 0 16px; }
+  </style>
+</head>
+<body data-page="promotions">
+  <div id="site-header"></div>
+  <main>
+    <section class="hero" style="padding-bottom:32px;">
+      <div class="wrap">
+        <p class="kicker">club.promotions</p>
+        <h1 style="max-width:16ch;">Акции</h1>
+        <p class="lead">Две проверяются вручную поддержкой (10 минут днём, до часа ночью), одна работает полностью автоматически.</p>
+      </div>
+    </section>
+
+    <section class="block" style="padding-top:0;">
+      <div class="wrap">
+
+        <!-- Review bonus -->
+        <div class="panel" style="margin-bottom:16px;">
+          <span class="tag">1000 бонусов</span>
+          <h3>За отзыв на Яндекс Картах и 2ГИС</h3>
+          <ol class="promo-steps">
+            <li>Только от посетителей, которые уже были в клубе</li>
+            <li>Один посетитель = один отзыв в каждом сервисе</li>
+            <li>Оставьте отзыв: <a href="https://yandex.ru/maps/org/404_kiberkhaus/7890234767" target="_blank" rel="noopener" style="color:var(--accent);">Яндекс Карты</a> и <a href="https://2gis.ru/samara/firm/70000001094261627" target="_blank" rel="noopener" style="color:var(--accent);">2ГИС</a></li>
+            <li>Пришлите скриншот отзыва и номер телефона (зарегистрированный в LANGAME)</li>
+          </ol>
+          <p class="promo-footnote">* бонусами можно оплатить до 50% от цены пакета</p>
+          <form class="promo-form" data-promo="review">
+            <div class="field">
+              <label>Скриншот отзыва</label>
+              <input type="file" accept="image/*" required>
+            </div>
+            <div class="field">
+              <label>Номер телефона (как в LANGAME)</label>
+              <input type="tel" placeholder="+79991234567" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Отправить на проверку</button>
+            <div class="status-msg"></div>
+          </form>
+        </div>
+
+        <!-- First top-up -->
+        <div class="panel" style="margin-bottom:16px;">
+          <span class="tag">бонус за пополнение</span>
+          <h3>Первое пополнение от 1000 ₽</h3>
+          <ol class="promo-steps">
+            <li>Нужна регистрация в клубе</li>
+            <li>Забронируйте или активируйте сессию на ПК</li>
+            <li>Пополните баланс на сумму не менее 1000 ₽</li>
+            <li>Пришлите скриншот чека и номер телефона (зарегистрированный в LANGAME)</li>
+          </ol>
+          <p class="promo-footnote">* бонусами можно оплатить до 50% от цены пакета</p>
+          <form class="promo-form" data-promo="topup">
+            <div class="field">
+              <label>Скриншот чека</label>
+              <input type="file" accept="image/*" required>
+            </div>
+            <div class="field">
+              <label>Номер телефона (как в LANGAME)</label>
+              <input type="tel" placeholder="+79991234567" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Отправить на проверку</button>
+            <div class="status-msg"></div>
+          </form>
+        </div>
+
+        <!-- Refer a friend -->
+        <div class="panel">
+          <span class="tag">автоматически</span>
+          <h3>Приведи друга</h3>
+          <p style="color:var(--text-muted); font-size:14px; margin-bottom:16px;">
+            Всё работает автоматически через LANGAME: профиль → «Пригласить друга» → отправьте свою ссылку.
+            Бонусы начислятся сами, как только друг зарегистрируется и оплатит первую сессию — присылать нам ничего не нужно.
+          </p>
+          <a href="https://langame.ru/club/799454628" target="_blank" rel="noopener" class="btn btn-ghost">Открыть LANGAME ↗</a>
+        </div>
+
+      </div>
+    </section>
+  </main>
+  <div id="site-footer"></div>
+  <script src="/js/layout.js"></script>
+  <script>
+    document.querySelectorAll('.promo-form').forEach(form => {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const statusEl = form.querySelector('.status-msg');
+        const btn = form.querySelector('button');
+        const promo = form.dataset.promo;
+        const file = form.querySelector('input[type="file"]').files[0];
+        const phone = form.querySelector('input[type="tel"]').value;
+
+        btn.disabled = true;
+        btn.textContent = 'Отправка…';
+
+        const fd = new FormData();
+        fd.append('promo', promo);
+        fd.append('phone', phone);
+        if (file) fd.append('screenshot', file, file.name);
+
+        try {
+          const res = await fetch('/api/promotions/claim', { method: 'POST', body: fd });
+          if (!res.ok) throw new Error();
+          statusEl.textContent = 'Отправлено на проверку в Тех.поддержку — обычно до 10 минут днём, до часа ночью.';
+          statusEl.className = 'status-msg show ok';
+          btn.textContent = 'Отправлено';
+        } catch {
+          statusEl.textContent = 'Не удалось отправить. Попробуйте ещё раз.';
+          statusEl.className = 'status-msg show err';
+          btn.disabled = false;
+          btn.textContent = 'Отправить на проверку';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

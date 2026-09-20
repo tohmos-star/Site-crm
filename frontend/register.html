@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Регистрация — 404</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .step { display: none; }
+    .step.active { display: block; }
+    .progress { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+    .req-list { list-style: none; padding: 0; margin: 20px 0; }
+    .req-list li { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; display: flex; gap: 10px; }
+    .req-list li:last-child { border-bottom: none; }
+    .upload-box {
+      border: 1px dashed var(--border); border-radius: 10px; min-height: 120px;
+      display: flex; align-items: center; justify-content: center; text-align: center;
+      cursor: pointer; position: relative; overflow: hidden;
+      background: var(--bg); margin-bottom: 16px; padding: 12px;
+    }
+    .upload-box.filled { border-style: solid; border-color: var(--ok); }
+    .upload-box.filled .upload-label { display: none; }
+    .upload-box img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .upload-box input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .upload-label { font-size: 14px; color: var(--text-muted); }
+    .age-warning { font-size: 13px; color: var(--accent); margin-top: 8px; }
+    .pending-panel { text-align: center; padding: 40px 24px; }
+    .pending-panel .badge-big {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 56px; height: 56px; border-radius: 50%; background: var(--panel-raised);
+      border: 1px solid var(--border); font-family: var(--font-mono); font-size: 20px; margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body data-page="register">
+  <div id="site-header"></div>
+
+  <main>
+    <section class="hero" style="padding-bottom:32px;">
+      <div class="wrap">
+        <p class="kicker">access.register</p>
+        <h1 style="max-width:16ch;">Регистрация в клубе</h1>
+        <p class="lead">Занимает 3–5 минут и проходит полностью здесь, на сайте. После подтверждения — доступ 24/7 и 500 бонусов на баланс.</p>
+      </div>
+    </section>
+
+    <section class="block" style="padding-top:0;">
+      <div class="wrap">
+        <div class="form-panel" style="max-width:560px;">
+
+          <!-- STEP 0: intro + requirements + consent -->
+          <div class="step active" id="step-intro">
+            <p style="color:var(--text-muted); font-size:14px; margin-bottom:16px;">Что понадобится:</p>
+            <ul class="req-list">
+              <li>📱 Номер телефона</li>
+              <li>🪪 ФИО как в документе</li>
+              <li>📸 Фото документа, удостоверяющего личность (паспорт или другой документ с фото)</li>
+              <li>🤳 Селфи</li>
+            </ul>
+            <p class="age-warning">⚠️ Доступ в клуб — строго с 18 лет.</p>
+            <p style="color:var(--text-muted); font-size:13px; margin:16px 0;">
+              Документ и селфи нужны, чтобы подтвердить личность и возраст. Телефон и ФИО — для вашего клубного аккаунта. Мы ничего не храним лишнего и нигде не публикуем.
+            </p>
+            <p style="color:var(--text); font-size:14px; margin-bottom:20px;">🎁 За прохождение регистрации — 500 бонусов на баланс, начислим после подтверждения.</p>
+
+            <label class="check-item" style="margin-bottom:20px; cursor:pointer;">
+              <input type="checkbox" id="consent">
+              <span class="txt" style="font-size:13px;">Согласен(на) на <a href="/privacy.html" style="color:var(--accent);">обработку персональных данных</a></span>
+            </label>
+
+            <button class="btn btn-primary" id="startBtn" style="width:100%; justify-content:center;" disabled>
+              Начать
+            </button>
+          </div>
+
+          <!-- STEP 1: phone -->
+          <div class="step" id="step-phone">
+            <p class="progress">Шаг 1 из 5</p>
+            <div class="field">
+              <label for="r-phone">Номер телефона</label>
+              <input type="tel" id="r-phone" placeholder="+79991234567" required>
+              <div class="hint" id="phoneHint"></div>
+            </div>
+            <button class="btn btn-primary" id="phoneNext" style="width:100%; justify-content:center;">Далее</button>
+          </div>
+
+          <!-- STEP 1.5: password (телефон = логин, пароль придумывает гость) -->
+          <div class="step" id="step-password">
+            <p class="progress">Шаг 2 из 5</p>
+            <div class="field">
+              <label for="r-password">Придумайте пароль</label>
+              <input type="password" id="r-password" placeholder="Минимум 6 символов" required>
+              <div class="hint">Понадобится при следующих входах — вместе с номером телефона.</div>
+            </div>
+            <button class="btn btn-primary" id="passwordNext" style="width:100%; justify-content:center;">Далее</button>
+          </div>
+
+          <!-- STEP 2: ФИО -->
+          <div class="step" id="step-fio">
+            <p class="progress">Шаг 3 из 5</p>
+            <div class="field">
+              <label for="r-fio">ФИО — точно как в документе</label>
+              <input type="text" id="r-fio" placeholder="Иванов Иван Иванович" required>
+              <div class="hint">Важно, чтобы совпадало с документом, который будете загружать дальше.</div>
+            </div>
+            <button class="btn btn-primary" id="fioNext" style="width:100%; justify-content:center;">Далее</button>
+          </div>
+
+          <!-- STEP 3: document photo -->
+          <div class="step" id="step-doc">
+            <p class="progress">Шаг 4 из 5 — самый важный</p>
+            <p style="font-size:14px; color:var(--text-muted); margin-bottom:16px;">
+              Нужна фотография документа с фото и ФИО — подойдёт паспорт (главный разворот), водительское удостоверение или загранпаспорт.
+            </p>
+            <label class="upload-box" id="docBox">
+              <span class="upload-label">Нажмите, чтобы загрузить фото документа</span>
+              <input type="file" accept="image/*" capture="environment" id="docInput">
+            </label>
+            <button class="btn btn-primary" id="docNext" style="width:100%; justify-content:center;" disabled>Далее</button>
+          </div>
+
+          <!-- STEP 4: selfie -->
+          <div class="step" id="step-selfie">
+            <p class="progress">Шаг 5 из 5 — последний!</p>
+            <p style="font-size:14px; color:var(--text-muted); margin-bottom:16px;">
+              Фото своего лица — сверим с документом, и всё, вы в системе.
+            </p>
+            <label class="upload-box" id="selfieBox">
+              <span class="upload-label">Нажмите, чтобы сделать/загрузить селфи</span>
+              <input type="file" accept="image/*" capture="user" id="selfieInput">
+            </label>
+            <button class="btn btn-primary" id="selfieNext" style="width:100%; justify-content:center;" disabled>Отправить на проверку</button>
+          </div>
+
+          <!-- STEP 5: pending -->
+          <div class="step" id="step-pending">
+            <div class="pending-panel">
+              <div class="badge-big">✓</div>
+              <h3 style="margin:0 0 12px;">Готово! Все данные отправлены на проверку</h3>
+              <p style="color:var(--text-muted); font-size:14px; line-height:1.7;">
+                С 9:00 до 23:00 отвечаем быстро — обычно в течение 10 минут.
+                Ночью поддержка тоже на месте, но людей меньше, поэтому ответ
+                может занять до 1 часа.
+              </p>
+              <p style="color:var(--text-muted); font-size:14px; line-height:1.7;">
+                Как только подтвердим — откроем доступ и начислим 500 бонусов.
+                Если не ответим за час — звоните: <strong style="color:var(--text);">8 (908) 404-04-40</strong>.
+              </p>
+              <div style="display:flex; gap:10px; justify-content:center; margin-top:20px; flex-wrap:wrap;">
+                <a href="/login.html" class="btn btn-primary">Перейти ко входу</a>
+                <a href="/location.html" class="btn btn-ghost">Как нас найти</a>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/layout.js"></script>
+  <script src="/js/register.js"></script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>404 — автоматизированный компьютерный клуб в Самаре</title>
+  <meta name="description" content="Клуб без администраторов: вход по верификации, ПК в отдельных нишах, автоматическое бронирование и учёт сессий.">
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body data-page="home">
+  <div id="site-header"></div>
+
+  <main>
+    <section class="hero">
+      <div class="wrap">
+        <p class="kicker">первый клуб без администраторов · самара</p>
+        <h1>Клуб работает сам. Вам остаётся только играть.</h1>
+        <p class="lead">Никаких администраторов на входе и живых очередей — только вы и умный клуб,
+          который сам вас впустит. Регистрация — 3–5 минут, один раз.</p>
+        <div class="actions">
+          <a href="/register.html" class="btn btn-primary">Начать регистрацию</a>
+          <a href="/club.html" class="btn btn-ghost">О клубе</a>
+        </div>
+
+        <div class="console">
+          <div class="console-head">
+            <span>club.status</span>
+            <span id="console-updated">обновляется…</span>
+          </div>
+          <div class="console-body">
+            <div class="console-metric">
+              <div class="val ok" id="metric-free">—</div>
+              <div class="lbl">свободных мест</div>
+            </div>
+            <div class="console-metric">
+              <div class="val" id="metric-total">—</div>
+              <div class="lbl">всего рабочих мест</div>
+            </div>
+            <div class="console-metric">
+              <div class="val accent" id="metric-next">—</div>
+              <div class="lbl">ближайшая бронь освободится</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="wrap">
+        <h2>Как устроен вход</h2>
+        <p class="sub">Три шага без очереди на ресепшене — потому что ресепшена нет.</p>
+        <div class="grid cols-3">
+          <div class="panel">
+            <span class="tag">01</span>
+            <h3>Регистрация</h3>
+            <p>Телефон, ФИО, фото документа и селфи — один раз. Проверка вручную, обычно до 10 минут днём.</p>
+          </div>
+          <div class="panel">
+            <span class="tag">02</span>
+            <h3>Вход по коду</h3>
+            <p>После подтверждения — персональный код на дверь и ссылка на домофон, каждый раз при визите.</p>
+          </div>
+          <div class="panel">
+            <span class="tag">03</span>
+            <h3>Отчёт после сессии</h3>
+            <p>Чек-лист и пара фото рабочего места при выходе — за это начисляются бонусные баллы.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="wrap">
+        <h2>Разделы</h2>
+        <p class="sub">Всё то же самое, что раньше было доступно только в Telegram-боте.</p>
+        <div class="grid cols-3">
+          <a href="/club.html" class="panel" style="text-decoration:none;">
+            <h3>О клубе</h3>
+            <p>Комнаты, умный дом, железо, бар.</p>
+          </a>
+          <a href="/prices.html" class="panel" style="text-decoration:none;">
+            <h3>Прайс</h3>
+            <p>DUO / SOLO / SOLO+, будни и выходные.</p>
+          </a>
+          <a href="/promotions.html" class="panel" style="text-decoration:none;">
+            <h3>Акции</h3>
+            <p>Бонусы за отзыв, пополнение, друзей.</p>
+          </a>
+          <a href="/location.html" class="panel" style="text-decoration:none;">
+            <h3>Как нас найти</h3>
+            <p>Маршрут от улицы до двери клуба.</p>
+          </a>
+          <a href="/support.html" class="panel" style="text-decoration:none;">
+            <h3>Тех.поддержка</h3>
+            <p>Проблема с местом или доступом.</p>
+          </a>
+          <a href="/social.html" class="panel" style="text-decoration:none;">
+            <h3>Наши соцсети</h3>
+            <p>ВКонтакте, Telegram, сайт.</p>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/layout.js"></script>
+  <script>
+    async function loadHomeStatus() {
+      try {
+        const res = await fetch('/api/status');
+        if (!res.ok) throw new Error();
+        return await res.json();
+      } catch {
+        return { open: true, free: 6, total: 20, nextFreeAt: '19:30' };
+      }
+    }
+    loadHomeStatus().then(d => {
+      document.getElementById('metric-free').textContent = d.free;
+      document.getElementById('metric-total').textContent = d.total;
+      document.getElementById('metric-next').textContent = d.nextFreeAt || '—';
+      document.getElementById('console-updated').textContent = 'обновлено ' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    });
+  </script>
+</body>
+</html>

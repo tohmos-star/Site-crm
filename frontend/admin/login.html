@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>404 — админка</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+  <main style="min-height:100vh; display:flex; align-items:center; justify-content:center;">
+    <div class="form-panel" style="width:100%; max-width:380px;">
+      <p class="kicker" style="margin-bottom:16px;">admin.login</p>
+      <form id="adminLoginForm">
+        <div class="field"><label for="a-login">Логин</label><input type="text" id="a-login" required></div>
+        <div class="field"><label for="a-password">Пароль</label><input type="password" id="a-password" required></div>
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Войти</button>
+        <div class="status-msg" id="adminLoginStatus"></div>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const statusEl = document.getElementById('adminLoginStatus');
+      const btn = e.target.querySelector('button');
+      btn.disabled = true;
+      btn.textContent = 'Вход…';
+
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            login: document.getElementById('a-login').value.trim(),
+            password: document.getElementById('a-password').value,
+          }),
+        });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        localStorage.setItem('adminToken', data.token);
+        window.location.href = '/admin/index.html';
+      } catch {
+        statusEl.textContent = 'Неверный логин или пароль.';
+        statusEl.className = 'status-msg show err';
+        btn.disabled = false;
+        btn.textContent = 'Войти';
+      }
+    });
+  </script>
+</body>
+</html>

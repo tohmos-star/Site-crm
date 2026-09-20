@@ -1,11 +1,8 @@
-// 404 Cyber House — billing & booking module
-// Scope: Zone/Device, Tariffs, Booking/Session, Guest+Balance, Loyalty,
-// Refunds, Payments/Fiscalization (stub providers — real Т-Банк integration
-// is a separate follow-up, see src/modules/payments and src/modules/fiscal).
-//
-// Out of scope here (owned by other modules, not yet built):
-// registration wizard, phone+password auth, door/intercom codes, guest CRUD UI.
-// Guest below is intentionally minimal — just enough to hang billing on.
+// 404 Cyber House — CRM: billing/booking module + auth + guest/PC-agent/admin
+// integration layer. Single backend for the site (frontend/), the Android
+// guest app, and the PC session-widget agent — see README.md "Integration
+// architecture" for the auth model (guest+admin JWT, per-device agent token)
+// and the façade/domain route split.
 
 generator client {
   provider = "prisma-client-js"
@@ -21,11 +18,21 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model Club {
-  id        String   @id @default(cuid())
-  name      String
-  address   String
-  timezone  String   @default("Europe/Samara")
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  name           String
+  address        String
+  timezone       String   @default("Europe/Samara")
+  // "Войти в клуб" (frontend/entry.html) + админ-вкладка "Домофон и коды"
+  // (frontend/admin/app.js): единый общеклубный доступ, который админ
+  // руками задаёт и меняет — НЕ код на гостя, несмотря на текст на сайте
+  // ("персональный, сгенерирован для вас") — реальный /api/admin/access-
+  // credential модель именно такая: один intercomUrl + doorCodeMain
+  // (обязательный) + doorCodeSecond (опциональный, напр. на переходный
+  // период смены кода).
+  intercomUrl    String?
+  doorCodeMain   String?
+  doorCodeSecond String?
+  createdAt      DateTime @default(now())
 
   zones          Zone[]
   devices        Device[]
@@ -47,6 +54,12 @@ model Zone {
   color     String  @default("#f97316")
   sortOrder Int     @default(0)
   isRoom    Boolean @default(false)
+
+  // Какой тариф зоны использовать для быстрой брони из приложения/сайта
+  // (где гость не выбирает тариф явно — см. façade POST /api/bookings).
+  // Admin-настраиваемое поле, не выводится автоматически из TariffRule.
+  defaultTariffId String?
+  defaultTariff   Tariff? @relation("ZoneDefaultTariff", fields: [defaultTariffId], references: [id])
 
   devices     Device[]
   tariffRules TariffRule[]
@@ -95,6 +108,10 @@ model Device {
   color        String?
   status       DeviceStatus @default(FREE)
   comment      String?
+  // Токен ПК-агента (pc-widget.html) — выдаётся один раз при настройке
+  // станции, хранится локально на ПК, не привязан к аккаунту гостя. См.
+  // requireDevice() в src/modules/auth.
+  agentToken   String?      @unique
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
@@ -202,6 +219,7 @@ model Tariff {
   bookings           Booking[]
   sessions           Session[]
   guestSubscriptions GuestSubscription[]
+  defaultForZones    Zone[]              @relation("ZoneDefaultTariff")
 
   @@index([groupId])
 }
@@ -249,16 +267,31 @@ model TariffRule {
 }
 
 // ---------------------------------------------------------------------------
-// Guest (minimal — auth/registration wizard is a separate module)
+// Guest + registration/auth
 // ---------------------------------------------------------------------------
 
+// Как на сайте (register.html/login.html): регистрация не логинит сразу —
+// анкета уходит на проверку админу (docPhotoPath/selfiePhotoPath), войти
+// можно только после APPROVED. REJECTED — админ отклонил анкету.
+enum GuestRegStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model Guest {
-  id        String    @id @default(cuid())
-  phone     String    @unique
-  fullName  String?
-  email     String?
-  birthDate DateTime? @db.Date
-  createdAt DateTime  @default(now())
+  id              String         @id @default(cuid())
+  phone           String         @unique
+  passwordHash    String?
+  fullName        String?
+  email           String?
+  birthDate       DateTime?      @db.Date
+  regStatus       GuestRegStatus @default(PENDING)
+  // Фото документа/селфи с регистрации — путь к файлу на диске (см.
+  // src/lib/uploads.ts), проверяются админом при разборе анкеты.
+  docPhotoPath    String?
+  selfiePhotoPath String?
+  createdAt       DateTime       @default(now())
 
   manualGroupId String?
   manualGroup   GuestManualGroup? @relation(fields: [manualGroupId], references: [id])
@@ -273,6 +306,18 @@ model Guest {
   subscriptions       GuestSubscription[]
 
   @@index([phone])
+  @@index([regStatus])
+}
+
+// Учётка админа/сотрудника — вход в /admin отдельным логином, не связан с
+// гостевым Guest. Ролей пока одна (полный доступ) — разделение прав можно
+// добавить позже, поле здесь как задел.
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String?
+  createdAt    DateTime @default(now())
 }
 
 // ---------------------------------------------------------------------------
@@ -346,6 +391,14 @@ model Session {
   startedAt   DateTime      @default(now())
   endsAt      DateTime
   completedAt DateTime?
+
+  // Carsharing-стиль подтверждения чистоты места при досрочном завершении
+  // гостем (см. frontend/report.js, android EndSessionScreen) — не
+  // заполняется, если сессию завершает станция/время истекло.
+  reportCleanDesk    Boolean  @default(false)
+  reportCleanPc      Boolean  @default(false)
+  reportCleanHeadset Boolean  @default(false)
+  reportPhotoPaths   String[] @default([])
 
   extensions SessionExtension[]
 

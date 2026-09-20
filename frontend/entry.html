@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Войти в клуб — 404</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .step-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; border-radius: 50%; background: var(--accent);
+      color: #12100E; font-weight: 700; font-size: 14px; margin-right: 10px; flex-shrink: 0;
+    }
+    .entry-step { display: flex; gap: 12px; margin-bottom: 16px; }
+    .entry-step .body { flex: 1; }
+    .code-display {
+      font-family: var(--font-mono); font-size: 32px; letter-spacing: 0.05em;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      padding: 16px; text-align: center; margin: 12px 0; color: var(--ok);
+    }
+  </style>
+</head>
+<body data-page="entry">
+  <div id="site-header"></div>
+
+  <main>
+    <section class="hero" style="padding-bottom:32px;">
+      <div class="wrap">
+        <p class="kicker">access.entry</p>
+        <h1 style="max-width:16ch;">Вход в клуб</h1>
+        <p class="lead">Два независимых шага — ссылка от домофона (первая дверь) и код от двери (нижняя дверь). Если ещё не зарегистрированы — <a href="/register.html" style="color:var(--accent);">начните здесь</a>.</p>
+      </div>
+    </section>
+
+    <section class="block" style="padding-top:0;">
+      <div class="wrap">
+        <div class="form-panel" style="max-width:560px;" id="entryPanel">
+
+          <div class="entry-step">
+            <span class="step-num">1</span>
+            <div class="body">
+              <h3 style="margin:0 0 6px; font-size:16px;">Ссылка от домофона (первая дверь)</h3>
+              <p style="color:var(--text-muted); font-size:14px; margin:0 0 10px;">Откройте по ссылке:</p>
+              <a href="#" class="btn btn-primary" id="intercomLink" style="width:100%; justify-content:center;">
+                Открыть домофон
+              </a>
+              <p style="color:var(--text-muted); font-size:12px; margin-top:10px;">
+                Не открывается? Сначала отключите VPN — с ним ссылка не срабатывает.
+                Если всё равно не работает — <a href="/support.html" style="color:var(--accent);">напишите в поддержку</a>
+                (обычно отвечаем за 10 минут днём, до 1 часа ночью) или звоните: 8 (908) 404-04-40.
+              </p>
+            </div>
+          </div>
+
+          <div class="entry-step">
+            <span class="step-num">2</span>
+            <div class="body">
+              <h3 style="margin:0 0 6px; font-size:16px;">Код от двери (нижняя дверь)</h3>
+              <p style="color:var(--text-muted); font-size:14px; margin:0;">Введите код на панели:</p>
+              <div class="code-display" id="doorCode">— — — — — — —</div>
+              <p style="color:var(--text-muted); font-size:12px;">Код персональный, сгенерирован автоматически именно для вас.</p>
+            </div>
+          </div>
+
+          <div class="status-msg show" id="entryNote" style="background:var(--panel-raised); color:var(--text-muted); border:1px solid var(--border);">
+            Демо-режим: ссылка и код ниже — заглушки. После подключения backend здесь будут реальные данные, привязанные к вашей сессии.
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/layout.js"></script>
+  <script>
+    async function loadEntryData() {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        window.location.href = '/login.html';
+        return;
+      }
+      try {
+        const res = await fetch('/api/entry-access', { headers: { Authorization: `Bearer ${token}` } });
+        if (res.status === 401) {
+          localStorage.removeItem('authToken');
+          window.location.href = '/login.html';
+          return;
+        }
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        document.getElementById('intercomLink').href = data.intercomUrl;
+        document.getElementById('doorCode').textContent = data.doorCodeMain;
+      } catch {
+        // Демо-заглушки — реальные значения выдаёт backend после проверки регистрации
+        document.getElementById('intercomLink').href = '#';
+        document.getElementById('doorCode').textContent = '7251957#';
+      }
+    }
+    loadEntryData();
+  </script>
+</body>
+</html>

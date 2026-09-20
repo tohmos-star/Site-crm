@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Предложения — 404</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .step { display: none; }
+    .step.active { display: block; }
+    .progress { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+    .choice-btn {
+      display: block; width: 100%; text-align: left; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px;
+      color: var(--text); font-size: 15px; margin-bottom: 10px; cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+    .choice-btn:hover { border-color: var(--accent); }
+    .choice-btn.selected { border-color: var(--ok); background: var(--panel-raised); }
+    .multi-select .choice-btn { display: flex; align-items: center; gap: 10px; }
+    .promo-final { text-align: center; padding: 20px; }
+    .promo-code {
+      font-family: var(--font-mono); font-size: 20px; letter-spacing: 0.05em;
+      background: var(--bg); border: 1px solid var(--ok); border-radius: 8px;
+      padding: 14px; margin: 16px 0; color: var(--ok);
+    }
+  </style>
+</head>
+<body data-page="offers">
+  <div id="site-header"></div>
+
+  <main>
+    <section class="hero" style="padding-bottom:32px;">
+      <div class="wrap">
+        <p class="kicker">club.offers</p>
+        <h1 style="max-width:16ch;">Хотите сказать что-то клубу?</h1>
+        <p class="lead">Опрос — 2 минуты, промокод на 500 бонусов. Или напишите своими словами.</p>
+      </div>
+    </section>
+
+    <section class="block" style="padding-top:0;">
+      <div class="wrap">
+        <div class="form-panel" style="max-width:560px;">
+
+          <!-- ENTRY CHOICE -->
+          <div class="step active" id="step-choice">
+            <button class="choice-btn" id="btnSurvey">📋 Пройти опрос (2 минуты, промокод на 500 бонусов)</button>
+            <button class="choice-btn" id="btnFree">💬 Своё предложение</button>
+          </div>
+
+          <!-- FREE-FORM -->
+          <div class="step" id="step-free">
+            <div class="field">
+              <label for="freeText">Напишите свои пожелания и предложения для клуба</label>
+              <textarea id="freeText" rows="6" required></textarea>
+            </div>
+            <button class="btn btn-primary" id="freeSubmit" style="width:100%; justify-content:center;">Отправить</button>
+            <div class="status-msg" id="freeStatus"></div>
+          </div>
+
+          <!-- SURVEY: 9 questions -->
+          <div class="step" id="step-survey">
+            <p class="progress" id="qProgress">Вопрос 1 из 9</p>
+            <div id="qContainer"></div>
+          </div>
+
+          <!-- SURVEY FINAL -->
+          <div class="step" id="step-survey-final">
+            <div class="promo-final">
+              <h3 style="margin:0 0 10px;">Спасибо за ответы! 🙌</h3>
+              <p style="color:var(--text-muted); font-size:14px;">Промокод на 500 бонусов — активируйте в LANGAME → Магазин → Промокоды:</p>
+              <div class="promo-code">CLUB500</div>
+              <p style="color:var(--text-muted); font-size:12px;">Ответы анонимны и используются только для улучшения клуба.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/layout.js"></script>
+  <script src="/js/offers.js"></script>
+</body>
+</html>

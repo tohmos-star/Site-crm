@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Виджет на ПК — 404</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; background:#0B0C0E; color:#E7ECF3;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .note { font-size:11px; color:#8592A3; padding:8px 14px; border-bottom:1px solid #232529;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+</style>
+</head>
+<body>
+<div class="note">оверлей на игровой станции · подключается к /api/pc/redeem-code</div>
+<div id="pcwRoot"></div>
+<script>
+(function () {
+  // Цвета — из frontend/css/main.css :root, чтобы оверлей на станции не расходился с сайтом.
+  const BG = '#0B0C0E', SURFACE = '#151619', SURFACE_ALT = '#1B1D21', BORDER = '#232529';
+  const TEXT = '#F2F1ED', TEXT_MUTED = '#8B8D93';
+  const ACCENT = '#FF5A1F', OK = '#4ADE9C', WARN = '#F2C94C';
+  const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+  const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  const MINUTE_STEP = 10;
+  const TOPUP_AMOUNTS = [100, 500, 1000];
+  const SUPPORT_REASONS = ['Не открывается дверь', 'Проблема с ПК', 'Оплата и баланс'];
+
+  let sessionActive = false, codeInput = '', codeError = null, redeeming = false;
+  let stationLabel = '', hourlyTariff = 0;
+  // Баланс/продление/пополнение внутри виджета пока локальная демонстрация —
+  // POST /api/pc/redeem-code не возвращает guestId/баланс. Чтобы продление и
+  // пополнение прямо со станции списывали/пополняли реальный Guest.balanceRub,
+  // нужны отдельные station-facing эндпоинты — вынесено вместе с остальной
+  // физической интеграцией станции (см. TODO в pcAgent.ts).
+  let balance = 0;
+  let remainingMs = 0;
+  let sessionEnded = false, rebooting = false, visible = true;
+  let modal = null;
+  let extendMinutes = 30;
+  let cleanConfirmed = false;
+  let supportReason = null, supportMessage = '', supportSent = false;
+  let topupAmount = null, topupInput = '300', topupWantsReceipt = true, topupStage = 'pick';
+  const log = [];
+
+  const PACKAGES = () => ([
+    { id: '3h', label: '3 часа', minutes: 180, price: Math.round(hourlyTariff * 3) },
+    { id: '6h', label: '6 часов', minutes: 360, price: Math.round(hourlyTariff * 6 * 0.88) },
+  ]);
+
+  function fmtTime() { return new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
+  function fmtClock(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  }
+  function pushLog(text) { log.unshift({ time: fmtTime(), text }); if (log.length > 6) log.pop(); }
+  function minutePrice(min) { return Math.round((min / 60) * hourlyTariff); }
+
+  setInterval(() => { if (sessionActive && !sessionEnded && !rebooting) { remainingMs = Math.max(0, remainingMs - 200); render(); } }, 200);
+
+  // Реальный вызов агента станции — POST /api/pc/redeem-code { code }
+  // (см. backend/src/routes/pcAgent.ts). Код действует строго до конца
+  // оплаченного окна (startAt+minutesPaid), без грейс-периода — просроченный
+  // код сервер отклоняет (410), а не выдаёт новую сессию.
+  // TODO: авторизация станции (общий секрет/mTLS) — сейчас эндпоинт открыт,
+  // см. комментарий в pcAgent.ts.
+  async function submitCode() {
+    if (codeInput.length !== 6) return;
+    redeeming = true; codeError = null; render();
+    try {
+      const res = await fetch('/api/pc/redeem-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: codeInput }),
+      });
+      const data = await res.json();
+      redeeming = false;
+      if (!res.ok) {
+        codeError = data.error || 'Код не найден или уже использован';
+        render();
+        return;
+      }
+      stationLabel = data.station.label;
+      hourlyTariff = data.station.tariffPerHour;
+      remainingMs = data.remainingMs;
+      sessionActive = true;
+      pushLog(`Код принят — сессия начата (${data.station.label})`);
+      render();
+    } catch {
+      redeeming = false;
+      codeError = 'Нет связи с сервером — попробуйте ещё раз';
+      render();
+    }
+  }
+
+  function buyPackage(pkg) {
+    if (balance < pkg.price) return;
+    balance -= pkg.price; remainingMs += pkg.minutes * 60000; modal = null;
+    pushLog(`Продление: −${pkg.price} ₽ (${pkg.label}) → +${pkg.minutes} мин`);
+    render();
+  }
+  function buyMinutes(min) {
+    const price = minutePrice(min);
+    if (balance < price) return;
+    balance -= price; remainingMs += min * 60000; modal = null;
+    pushLog(`Продление: −${price} ₽ (${min} мин) → +${min} мин`);
+    render();
+  }
+  function simulateSiteConfirmation() {
+    cleanConfirmed = true; pushLog('Чистота рабочего места подтверждена на сайте'); render();
+    setTimeout(() => { modal = null; sessionEnded = true; pushLog('Сессия завершена'); render(); }, 900);
+  }
+  function confirmReboot() {
+    modal = null; rebooting = true; pushLog('Ручной ребут запрошен гостем — сессия не прерывается'); render();
+    setTimeout(() => { rebooting = false; pushLog('ПК перезагружен, сессия продолжается'); render(); }, 2200);
+  }
+  function sendSupport() {
+    if (!supportReason) return;
+    supportSent = true; pushLog(`Заявка в техподдержку: ${supportReason}${supportMessage ? ' — ' + supportMessage : ''}`); render();
+    setTimeout(() => { modal = null; render(); }, 1400);
+  }
+  function generateQr() {
+    const amount = parseInt(topupInput, 10); if (!amount) return;
+    topupAmount = amount; topupStage = 'waiting'; render();
+    setTimeout(() => confirmTopUp(amount), 2600);
+  }
+  function confirmTopUp(amount) {
+    balance += amount; topupStage = 'paid'; pushLog(`Пополнение через СБП: +${amount} ₽`); render();
+    setTimeout(() => { modal = null; render(); }, 1100);
+  }
+
+  function btn(bg, color, extra) { return `padding:10px 8px;border-radius:8px;border:1px solid ${BORDER};background:${bg};color:${color || TEXT};font-size:13px;font-weight:500;cursor:pointer;${extra || ''}`; }
+
+  function modalWrap(inner) {
+    return `<div data-action="backdrop" style="position:fixed;inset:0;background:rgba(6,8,11,0.72);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10;">
+      <div style="position:relative;width:min(92%,340px);background:${SURFACE};border:1px solid ${BORDER};border-radius:14px;padding:22px;">
+        <button data-action="close" style="position:absolute;top:10px;right:10px;background:transparent;border:none;color:${TEXT_MUTED};cursor:pointer;font-size:16px;">✕</button>
+        ${inner}
+      </div></div>`;
+  }
+
+  function renderModal() {
+    if (!modal) return '';
+    if (modal === 'extend') {
+      const pkgCards = PACKAGES().map(pkg => {
+        const affordable = balance >= pkg.price;
+        return `<button data-action="buyPackage" data-pkg="${pkg.id}" ${affordable ? '' : 'disabled'} style="text-align:left;padding:10px 11px;border-radius:10px;border:1px solid ${BORDER};background:${SURFACE_ALT};color:${affordable ? TEXT : TEXT_MUTED};cursor:${affordable ? 'pointer' : 'not-allowed'};opacity:${affordable ? 1 : 0.5};">
+          <div style="font-size:13px;font-weight:600;">${pkg.label}</div>
+          <div style="font-size:13px;font-family:${MONO};margin-top:4px;">${pkg.price} ₽</div>
+        </button>`;
+      }).join('');
+      const price = minutePrice(extendMinutes);
+      return modalWrap(`
+        <div style="text-align:center;"><div style="font-size:15px;font-weight:600;">Продлить время</div><div style="font-size:12px;color:${TEXT_MUTED};margin-top:2px;">Баланс: ${balance} ₽ · тариф ${hourlyTariff} ₽/ч</div></div>
+        <div style="font-size:12px;color:${TEXT_MUTED};margin:14px 0 6px;text-align:left;">Пакеты</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">${pkgCards}</div>
+        <div style="border-top:1px solid ${BORDER};padding-top:12px;margin-top:14px;">
+          <div style="font-size:12px;color:${TEXT_MUTED};margin-bottom:8px;text-align:left;">Поминутная тарификация · шаг ${MINUTE_STEP} мин</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button data-action="step" data-dir="-1" style="${btn(SURFACE_ALT, TEXT, 'width:36px;')}">−</button>
+            <div style="flex:1;text-align:center;"><div style="font-family:${MONO};font-size:18px;font-weight:600;">${extendMinutes} мин</div><div style="font-family:${MONO};font-size:11.5px;color:${TEXT_MUTED};">${price} ₽</div></div>
+            <button data-action="step" data-dir="1" style="${btn(SURFACE_ALT, TEXT, 'width:36px;')}">+</button>
+          </div>
+          <button data-action="buyMinutes" ${balance < price ? 'disabled' : ''} style="width:100%;margin-top:10px;${btn(balance >= price ? ACCENT : SURFACE_ALT, balance >= price ? '#0B1D14' : TEXT_MUTED)}">Продлить на ${extendMinutes} мин</button>
+        </div>`);
+    }
+    if (modal === 'end') {
+      return modalWrap(`
+        <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;">
+          <div style="font-size:34px;">▦</div>
+          <div style="font-size:15px;font-weight:600;">Подтвердите чистоту рабочего места</div>
+          <div style="font-size:13px;color:${TEXT_MUTED};">Отсканируйте код или откройте ссылку на сайте — сессия завершится автоматически.</div>
+          ${cleanConfirmed
+            ? `<div style="color:${OK};font-size:13px;">✓ Подтверждено, завершаем…</div>`
+            : `<button data-action="confirmClean" style="width:100%;${btn(SURFACE_ALT)}">Демо: подтвердить с сайта</button>`}
+        </div>`);
+    }
+    if (modal === 'reboot') {
+      return modalWrap(`
+        <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;">
+          <div style="font-size:32px;color:${WARN};">↻</div>
+          <div style="font-size:15px;font-weight:600;">Перезагрузить ПК?</div>
+          <div style="font-size:13px;color:${TEXT_MUTED};">Сессия не прервётся, оплаченное время продолжит отсчитываться.</div>
+          <div style="display:flex;gap:8px;width:100%;">
+            <button data-action="close" style="flex:1;${btn(SURFACE_ALT)}">Отмена</button>
+            <button data-action="confirmReboot" style="flex:1;${btn(WARN, '#1A1206')}">Перезагрузить</button>
+          </div>
+        </div>`);
+    }
+    if (modal === 'support') {
+      const reasons = SUPPORT_REASONS.map(r => `<button data-action="setReason" data-reason="${r}" style="width:100%;text-align:left;padding:10px 12px;border-radius:8px;border:1px solid ${supportReason === r ? ACCENT : BORDER};background:${supportReason === r ? SURFACE_ALT : 'transparent'};color:${TEXT};cursor:pointer;">${r}</button>`).join('');
+      return modalWrap(`
+        <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;">
+          <div style="font-size:32px;">🛟</div>
+          <div style="font-size:15px;font-weight:600;">Тех.поддержка</div>
+          <div style="font-size:12.5px;color:${TEXT_MUTED};margin-top:-4px;">90% проблем решаются перезагрузкой ПК</div>
+          ${supportSent ? `<div style="color:${OK};font-size:13px;">✓ Заявка отправлена, администратор уведомлён</div>` : `
+          <div style="width:100%;text-align:left;"><div style="font-size:12px;color:${TEXT_MUTED};margin-bottom:6px;">Тема</div><div style="display:flex;flex-direction:column;gap:6px;">${reasons}</div></div>
+          <div style="width:100%;text-align:left;"><div style="font-size:12px;color:${TEXT_MUTED};margin:10px 0 6px;">Сообщение</div><textarea data-action="supportMessage" rows="3" placeholder="Опишите проблему подробнее (необязательно)" style="width:100%;resize:none;background:${SURFACE_ALT};border:1px solid ${BORDER};border-radius:8px;color:${TEXT};font-size:13px;padding:10px;box-sizing:border-box;font-family:${SANS};"></textarea></div>
+          <button data-action="sendSupport" ${supportReason ? '' : 'disabled'} style="width:100%;${btn(supportReason ? ACCENT : SURFACE_ALT, supportReason ? '#0B1D14' : TEXT_MUTED)}">Отправить</button>`}
+        </div>`);
+    }
+    if (modal === 'topup') {
+      let body = '';
+      if (topupStage === 'pick') {
+        const amount = parseInt(topupInput, 10);
+        body = `
+          <div style="text-align:left;"><div style="font-size:12px;color:${TEXT_MUTED};margin-bottom:6px;">Сумма пополнения</div>
+            <div style="display:flex;align-items:center;border:1px solid ${BORDER};border-radius:8px;background:${SURFACE_ALT};padding:10px 12px;">
+              <input type="number" value="${topupInput}" data-action="topupInput" style="flex:1;background:transparent;border:none;outline:none;color:${TEXT};font-size:20px;font-weight:600;font-family:${MONO};">
+              <span style="color:${TEXT_MUTED};">₽</span>
+            </div></div>
+          <div style="display:flex;gap:8px;">${TOPUP_AMOUNTS.map(a => `<button data-action="addTopup" data-amt="${a}" style="flex:1;${btn(SURFACE_ALT, TEXT, 'font-size:12.5px;')}">+${a} ₽</button>`).join('')}</div>
+          <div style="display:flex;justify-content:space-between;font-size:12.5px;color:${TEXT_MUTED};"><span>Баланс после пополнения</span><span style="color:${TEXT};font-family:${MONO};">${balance + (amount || 0)} ₽</span></div>
+          <div style="border-top:1px solid ${BORDER};padding-top:10px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;"><input type="checkbox" data-action="toggleReceipt" ${topupWantsReceipt ? 'checked' : ''}> Получить электронный чек на почту</label>
+          </div>
+          <button data-action="generateQr" ${(amount && topupWantsReceipt) ? '' : 'disabled'} style="width:100%;${btn((amount && topupWantsReceipt) ? ACCENT : SURFACE_ALT, (amount && topupWantsReceipt) ? '#0B1D14' : TEXT_MUTED)}">Оплатить</button>`;
+      } else if (topupStage === 'waiting') {
+        body = `
+          <div style="width:148px;height:148px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;margin:4px auto;font-size:60px;">▦</div>
+          <div style="font-size:15px;font-weight:600;">${topupAmount} ₽ через СБП</div>
+          <div style="font-size:12.5px;color:${TEXT_MUTED};">Ждём оплату…</div>
+          <button data-action="forceConfirm" style="width:100%;${btn(SURFACE_ALT, TEXT_MUTED, 'font-size:12px;')}">Демо: платёж пришёл</button>`;
+      } else {
+        body = `<div style="color:${OK};font-size:14px;padding:10px 0;">✓ Баланс пополнен на ${topupAmount} ₽</div>`;
+      }
+      return modalWrap(`<div style="text-align:center;display:flex;flex-direction:column;gap:10px;">${body}</div>`);
+    }
+    return '';
+  }
+
+  function render() {
+    const root = document.getElementById('pcwRoot');
+
+    if (!sessionActive) {
+      root.innerHTML = `
+        <div style="min-height:420px;background:linear-gradient(180deg,#1B2A4A 0%,#2C4770 38%,#5C7D9E 62%,#7FA06B 78%,#4C6B3C 100%);position:relative;overflow:hidden;font-family:${SANS};border-radius:12px;display:flex;align-items:center;justify-content:center;">
+          <div style="width:min(92%,320px);background:rgba(16,20,27,0.94);border:1px solid ${BORDER};border-radius:14px;padding:22px;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:${TEXT};margin-bottom:4px;">404 · станция свободна</div>
+            <div style="font-size:12px;color:${TEXT_MUTED};margin-bottom:18px;">Введите код брони</div>
+            <input id="pcwCodeInput" value="${codeInput}" placeholder="000000" maxlength="6" inputmode="numeric"
+              style="width:100%;text-align:center;background:${SURFACE_ALT};border:1px solid ${BORDER};border-radius:10px;color:${TEXT};font-family:${MONO};font-size:28px;letter-spacing:0.15em;padding:12px 0;box-sizing:border-box;">
+            ${codeError ? `<div style="color:${ACCENT};font-size:12px;margin-top:10px;">${codeError}</div>` : ''}
+            <button data-action="submitCode" ${(codeInput.length === 6 && !redeeming) ? '' : 'disabled'} style="width:100%;margin-top:14px;${btn(codeInput.length === 6 ? ACCENT : SURFACE_ALT, codeInput.length === 6 ? '#0B1D14' : TEXT_MUTED)}">${redeeming ? 'Проверяем…' : 'Подтвердить'}</button>
+            <div style="font-size:11px;color:${TEXT_MUTED};margin-top:12px;">Код — в личном кабинете после бронирования на вкладке «Сайт»</div>
+          </div>
+        </div>`;
+      const input = document.getElementById('pcwCodeInput');
+      input.focus();
+      input.setSelectionRange(codeInput.length, codeInput.length);
+      return;
+    }
+
+    const plannedEnd = new Date(Date.now() + remainingMs);
+    root.innerHTML = `
+      <div style="min-height:520px;background:linear-gradient(180deg,#1B2A4A 0%,#2C4770 38%,#5C7D9E 62%,#7FA06B 78%,#4C6B3C 100%);position:relative;overflow:hidden;font-family:${SANS};border-radius:12px;">
+        <div style="position:absolute;bottom:0;left:0;right:0;height:34px;background:rgba(10,12,16,0.55);"></div>
+        <div style="position:absolute;top:18px;right:14px;width:${visible ? '260px' : 'auto'};display:flex;flex-direction:column;align-items:${visible ? 'stretch' : 'flex-end'};">
+        ${visible ? `
+          <div style="background:rgba(16,20,27,0.9);border:1px solid ${BORDER};border-radius:12px;padding:13px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div style="font-size:13px;font-weight:600;color:${TEXT};">404 · ${stationLabel}</div>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="font-size:11.5px;color:${OK};">📶 онлайн</div>
+                <button data-action="minimize" style="background:transparent;border:none;color:${TEXT_MUTED};cursor:pointer;">−</button>
+              </div>
+            </div>
+            <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;">
+              <div style="font-size:12.5px;color:${TEXT_MUTED};font-family:${MONO};">Баланс: <span style="color:${TEXT};">${balance} ₽</span></div>
+              <button data-action="open" data-modal="topup" style="display:flex;align-items:center;gap:4px;padding:4px 9px;border-radius:999px;border:1px solid ${ACCENT};background:transparent;color:${ACCENT};font-size:11.5px;cursor:pointer;">+ Пополнить</button>
+            </div>
+            <div style="text-align:center;margin:14px 0 6px;">
+              <div style="font-family:${MONO};font-size:34px;font-weight:600;color:${sessionEnded ? TEXT_MUTED : rebooting ? ACCENT : remainingMs < 5 * 60000 ? WARN : OK};">${sessionEnded ? '--:--' : fmtClock(remainingMs)}</div>
+              <div style="font-size:12px;color:${TEXT_MUTED};margin-top:2px;">${sessionEnded ? 'Сессия завершена' : rebooting ? 'Идёт перезагрузка…' : `оплачено до ${plannedEnd.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`}</div>
+            </div>
+            ${!sessionEnded ? `
+              <div style="display:flex;gap:8px;margin-top:14px;">
+                <button data-action="open" data-modal="extend" style="flex:1;${btn(SURFACE_ALT)}">Продлить ▾</button>
+                <button data-action="open" data-modal="end" style="flex:1;${btn(SURFACE_ALT)}">Завершить</button>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:8px;">
+                <button data-action="open" data-modal="reboot" style="flex:1;${btn(SURFACE, TEXT_MUTED)}">Перезагрузить</button>
+                <button data-action="open" data-modal="support" style="flex:1;${btn(SURFACE, TEXT_MUTED)}">Техподдержка</button>
+              </div>` : ''}
+          </div>
+          <div style="margin-top:10px;border:1px solid ${BORDER};border-radius:10px;overflow:hidden;background:rgba(16,20,27,0.7);">
+            ${log.map((e, i) => `<div style="display:flex;gap:8px;padding:7px 11px;${i ? `border-top:1px solid ${BORDER};` : ''}font-size:11.5px;"><span style="font-family:${MONO};color:${TEXT_MUTED};flex-shrink:0;">${e.time}</span><span>${e.text}</span></div>`).join('')}
+          </div>
+        ` : `
+          <button data-action="minimize" style="width:34px;height:34px;border-radius:8px;border:1px solid ${BORDER};background:rgba(16,20,27,0.9);cursor:pointer;position:relative;">🖥️<span style="position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%;background:${OK};"></span></button>
+        `}
+        </div>
+        ${renderModal()}
+      </div>`;
+  }
+
+  const root = document.getElementById('pcwRoot');
+
+  root.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const action = el.dataset.action;
+    if (action === 'backdrop' && e.target !== el) return;
+    if (action === 'submitCode') return submitCode();
+    if (action === 'open') return openModal(el.dataset.modal);
+    if (action === 'close' || action === 'backdrop') return closeModal();
+    if (action === 'minimize') { visible = !visible; return render(); }
+    if (action === 'step') { extendMinutes = Math.max(MINUTE_STEP, extendMinutes + Number(el.dataset.dir) * MINUTE_STEP); return render(); }
+    if (action === 'buyPackage') return buyPackage(PACKAGES().find(p => p.id === el.dataset.pkg));
+    if (action === 'buyMinutes') return buyMinutes(extendMinutes);
+    if (action === 'confirmClean') return simulateSiteConfirmation();
+    if (action === 'confirmReboot') return confirmReboot();
+    if (action === 'setReason') { supportReason = el.dataset.reason; return render(); }
+    if (action === 'sendSupport') return sendSupport();
+    if (action === 'addTopup') { topupInput = String((parseInt(topupInput, 10) || 0) + Number(el.dataset.amt)); return render(); }
+    if (action === 'generateQr') return generateQr();
+    if (action === 'forceConfirm') return confirmTopUp(topupAmount);
+  });
+
+  root.addEventListener('input', (e) => {
+    const el = e.target.closest('[data-action], #pcwCodeInput');
+    if (!el) return;
+    if (el.id === 'pcwCodeInput') { codeInput = el.value.replace(/\D/g, '').slice(0, 6); codeError = null; render(); return; }
+    if (el.dataset.action === 'topupInput') { topupInput = el.value.replace(/[^0-9]/g, ''); render(); }
+    if (el.dataset.action === 'supportMessage') { supportMessage = el.value; }
+  });
+
+  root.addEventListener('keydown', (e) => {
+    if (e.target?.id === 'pcwCodeInput' && e.key === 'Enter') submitCode();
+  });
+
+  root.addEventListener('change', (e) => {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    if (el.dataset.action === 'toggleReceipt') { topupWantsReceipt = el.checked; render(); }
+  });
+
+  function openModal(m) {
+    modal = m;
+    if (m === 'end') cleanConfirmed = false;
+    if (m === 'support') { supportReason = null; supportMessage = ''; supportSent = false; }
+    if (m === 'topup') { topupStage = 'pick'; topupInput = '300'; }
+    render();
+  }
+  function closeModal() { modal = null; render(); }
+
+  render();
+})();
+
+</script>
+</body>
+</html>

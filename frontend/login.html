@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вход — 404</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body data-page="login">
+  <div id="site-header"></div>
+
+  <main>
+    <section class="hero" style="padding-bottom:32px;">
+      <div class="wrap">
+        <p class="kicker">access.login</p>
+        <h1 style="max-width:16ch;">Вход по телефону и паролю</h1>
+        <p class="lead">Логин — номер телефона, который вы указали при регистрации.</p>
+      </div>
+    </section>
+
+    <section class="block" style="padding-top:0;">
+      <div class="wrap">
+        <div class="form-panel">
+          <form id="loginForm">
+            <div class="field">
+              <label for="l-phone">Номер телефона</label>
+              <input type="tel" id="l-phone" placeholder="+79991234567" required>
+            </div>
+            <div class="field">
+              <label for="l-password">Пароль</label>
+              <input type="password" id="l-password" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Войти</button>
+            <div class="status-msg" id="loginStatus"></div>
+          </form>
+          <p style="color:var(--text-muted); font-size:13px; margin-top:16px;">
+            Ещё не регистрировались? <a href="/register.html" style="color:var(--accent);">Начать здесь</a>
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="site-footer"></div>
+
+  <script src="/js/layout.js"></script>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const statusEl = document.getElementById('loginStatus');
+      const btn = e.target.querySelector('button');
+      btn.disabled = true;
+      btn.textContent = 'Вход…';
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: document.getElementById('l-phone').value.trim(),
+            password: document.getElementById('l-password').value,
+          }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          if (data.status === 'pending') {
+            statusEl.textContent = 'Регистрация ещё на проверке — обычно до 10 минут днём, до часа ночью.';
+          } else if (data.status === 'rejected') {
+            statusEl.textContent = 'Регистрация отклонена. Обратитесь в поддержку.';
+          } else {
+            statusEl.textContent = 'Неверный телефон или пароль.';
+          }
+          statusEl.className = 'status-msg show err';
+          btn.disabled = false;
+          btn.textContent = 'Войти';
+          return;
+        }
+
+        localStorage.setItem('authToken', data.token);
+        window.location.href = '/entry.html';
+      } catch {
+        statusEl.textContent = 'Не удалось войти. Проверьте связь и попробуйте снова.';
+        statusEl.className = 'status-msg show err';
+        btn.disabled = false;
+        btn.textContent = 'Войти';
+      }
+    });
+  </script>
+</body>
+</html>

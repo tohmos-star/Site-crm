@@ -1,0 +1,102 @@
+import type { Guest, PrismaClient } from "@prisma/client";
+import { DomainError, NotFoundError } from "../../lib/errors.js";
+import { BalanceService } from "../balance/service.js";
+import type { CreateGuestBody, UpdateGuestBody } from "./schemas.js";
+
+// Façade поверх реального Guest/BalanceLedger — фигура ответа {id, phone,
+// fio, bonusPoints, verification} подобрана под уже готовую вкладку
+// "Гости" в frontend/admin/app.js (см. коммит), а не наоборот.
+export class AdminGuestsService {
+  private readonly balance: BalanceService;
+
+  constructor(private readonly prisma: PrismaClient) {
+    this.balance = new BalanceService(prisma);
+  }
+
+  async list(search?: string) {
+    const guests = await this.prisma.guest.findMany({
+      where: search ? { phone: { contains: search } } : undefined,
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    });
+    return Promise.all(guests.map((g) => this.toFacade(g)));
+  }
+
+  async create(body: CreateGuestBody) {
+    const guest = await this.prisma.guest.create({
+      data: {
+        phone: body.phone,
+        fullName: body.fio,
+        // Добавлен админом вручную (касса, у стойки) — сразу подтверждён,
+        // без анкеты/фото/пароля. Войти по паролю такой гость не сможет,
+        // пока не пройдёт обычную регистрацию сам.
+        regStatus: "APPROVED",
+      },
+    });
+    return this.toFacade(guest);
+  }
+
+  async update(id: string, body: UpdateGuestBody) {
+    const guest = await this.prisma.guest.findUnique({ where: { id } });
+    if (!guest) throw new NotFoundError("Guest", id);
+
+    if (body.bonusPoints !== undefined) {
+      const current = await this.balance.getBalance(id, "BONUS");
+      const delta = body.bonusPoints - Number(current);
+      if (delta !== 0) {
+        await this.balance.manualAdjust({
+          guestId: id,
+          kind: "BONUS",
+          delta,
+          sourceChannel: "ADMIN_CONSOLE",
+        });
+      }
+    }
+
+    const updated = await this.prisma.guest.update({
+      where: { id },
+      data: {
+        phone: body.phone,
+        fullName: body.fio,
+      },
+    });
+    return this.toFacade(updated);
+  }
+
+  async remove(id: string) {
+    const guest = await this.prisma.guest.findUnique({ where: { id } });
+    if (!guest) throw new NotFoundError("Guest", id);
+
+    const [bookingCount, sessionCount, ledgerCount] = await Promise.all([
+      this.prisma.booking.count({ where: { guestId: id } }),
+      this.prisma.session.count({ where: { guestId: id } }),
+      this.prisma.balanceLedger.count({ where: { guestId: id } }),
+    ]);
+    // Намеренно не каскадим удаление на историю броней/сессий/баланса —
+    // это финансовый аудит-след, его нельзя молча стирать вместе с гостем.
+    // Гостя без истории (добавлен по ошибке, не приходил) удалить можно.
+    if (bookingCount > 0 || sessionCount > 0 || ledgerCount > 0) {
+      throw new DomainError(
+        "GUEST_HAS_HISTORY",
+        "Нельзя удалить гостя с историей броней/сессий/баланса — есть данные финансового учёта",
+        409,
+      );
+    }
+
+    await this.prisma.guest.delete({ where: { id } });
+  }
+
+  private async toFacade(guest: Guest) {
+    const bonus = await this.balance.getBalance(guest.id, "BONUS");
+    return {
+      id: guest.id,
+      phone: guest.phone,
+      fio: guest.fullName,
+      bonusPoints: Number(bonus),
+      verification:
+        guest.regStatus === "PENDING" || guest.regStatus === "REJECTED" || guest.passwordHash
+          ? { status: guest.regStatus.toLowerCase() }
+          : null,
+    };
+  }
+}
