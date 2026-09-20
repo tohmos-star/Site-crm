@@ -13,7 +13,7 @@
 </style>
 </head>
 <body>
-<div class="note">оверлей на игровой станции · подключается к /api/pc/redeem-code</div>
+<div class="note">оверлей на игровой станции · подключается к /api/pc/*</div>
 <div id="pcwRoot"></div>
 <script>
 (function () {
@@ -26,19 +26,23 @@
   const MINUTE_STEP = 10;
   const TOPUP_AMOUNTS = [100, 500, 1000];
   const SUPPORT_REASONS = ['Не открывается дверь', 'Проблема с ПК', 'Оплата и баланс'];
+  const DEVICE_TOKEN_KEY = 'pcw_device_token';
 
-  let sessionActive = false, codeInput = '', codeError = null, redeeming = false;
-  let stationLabel = '', hourlyTariff = 0;
-  // Баланс/продление/пополнение внутри виджета пока локальная демонстрация —
-  // POST /api/pc/redeem-code не возвращает guestId/баланс. Чтобы продление и
-  // пополнение прямо со станции списывали/пополняли реальный Guest.balanceRub,
-  // нужны отдельные station-facing эндпоинты — вынесено вместе с остальной
-  // физической интеграцией станции (см. TODO в pcAgent.ts).
+  // screen: 'setup' (нет/невалиден токен станции) | 'checking' (проверяем
+  // активную сессию при загрузке) | 'code' (ввод кода брони) | 'active'.
+  let deviceToken = localStorage.getItem(DEVICE_TOKEN_KEY) || null;
+  let screen = deviceToken ? 'checking' : 'setup';
+  let setupInput = '', setupError = null, setupSaving = false;
+
+  let codeInput = '', codeError = null, redeeming = false;
+  let sessionId = null, sessionEndsAt = null, stationLabel = '', hourlyTariff = 0;
+  // Баланс — реальный Guest.balanceRub (MONEY), приходит с сервера в каждом
+  // ответе pcAgent (redeem-code/session/extend). Демо-пополнение ниже меняет
+  // только это отображаемое значение, не сервер — см. TOPUP note в модалке.
   let balance = 0;
-  let remainingMs = 0;
   let sessionEnded = false, rebooting = false, visible = true;
   let modal = null;
-  let extendMinutes = 30;
+  let extendMinutes = 30, extendPending = false, extendError = null;
   let cleanConfirmed = false;
   let supportReason = null, supportMessage = '', supportSent = false;
   let topupAmount = null, topupInput = '300', topupWantsReceipt = true, topupStage = 'pick';
@@ -57,61 +61,133 @@
   }
   function pushLog(text) { log.unshift({ time: fmtTime(), text }); if (log.length > 6) log.pop(); }
   function minutePrice(min) { return Math.round((min / 60) * hourlyTariff); }
+  function getRemainingMs() { return sessionEndsAt ? Math.max(0, sessionEndsAt.getTime() - Date.now()) : 0; }
 
-  setInterval(() => { if (sessionActive && !sessionEnded && !rebooting) { remainingMs = Math.max(0, remainingMs - 200); render(); } }, 200);
+  setInterval(() => { if (screen === 'active' && !sessionEnded && !rebooting) render(); }, 1000);
 
-  // Реальный вызов агента станции — POST /api/pc/redeem-code { code }
-  // (см. backend/src/routes/pcAgent.ts). Код действует строго до конца
-  // оплаченного окна (startAt+minutesPaid), без грейс-периода — просроченный
-  // код сервер отклоняет (410), а не выдаёт новую сессию.
-  // TODO: авторизация станции (общий секрет/mTLS) — сейчас эндпоинт открыт,
-  // см. комментарий в pcAgent.ts.
+  async function apiFetch(path, opts) {
+    const headers = Object.assign(
+      { 'Content-Type': 'application/json' },
+      opts && opts.headers,
+      deviceToken ? { Authorization: 'Bearer ' + deviceToken } : {},
+    );
+    let res, data = null;
+    try {
+      res = await fetch(path, Object.assign({}, opts, { headers }));
+      try { data = await res.json(); } catch { data = null; }
+    } catch {
+      return { ok: false, status: 0, data: null, networkError: true };
+    }
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  function applySession(s) {
+    sessionId = s.id;
+    stationLabel = s.stationLabel;
+    hourlyTariff = s.tariffPerHour;
+    sessionEndsAt = new Date(s.endsAt);
+    balance = s.guestBalanceRub ?? balance;
+    sessionEnded = s.status !== 'ACTIVE';
+  }
+
+  function invalidateDeviceToken(message) {
+    localStorage.removeItem(DEVICE_TOKEN_KEY);
+    deviceToken = null;
+    setupError = message || 'Токен станции недействителен — настройте заново';
+    screen = 'setup';
+  }
+
+  // При загрузке страницы (в т.ч. после ребута ПК) проверяем, нет ли уже
+  // активной сессии на этой станции — киоск не должен просить код повторно,
+  // если гость просто перезагрузил браузер/ПК посреди оплаченного времени.
+  async function checkSession() {
+    screen = 'checking'; render();
+    const { ok, status, data, networkError } = await apiFetch('/api/pc/session');
+    if (!ok) {
+      if (status === 401) { invalidateDeviceToken(); render(); return; }
+      screen = 'code';
+      codeError = networkError ? 'Нет связи с сервером' : null;
+      render();
+      return;
+    }
+    if (data && data.session) {
+      applySession(data.session);
+      screen = 'active';
+    } else {
+      screen = 'code';
+    }
+    render();
+  }
+
+  async function saveDeviceToken() {
+    const token = setupInput.trim();
+    if (!token) return;
+    setupSaving = true; setupError = null; render();
+    deviceToken = token;
+    const { ok, status } = await apiFetch('/api/pc/session');
+    if (!ok) {
+      setupSaving = false;
+      deviceToken = null;
+      setupError = status === 401 ? 'Неверный токен станции' : 'Не удалось проверить токен — нет связи с сервером';
+      render();
+      return;
+    }
+    localStorage.setItem(DEVICE_TOKEN_KEY, token);
+    setupSaving = false; setupInput = '';
+    await checkSession();
+  }
+
+  // Реальный вызов агента станции — POST /api/pc/redeem-code { code } с
+  // Authorization: Bearer <agentToken станции>. Код действует строго до
+  // конца оплаченного окна, без грейс-периода — просроченный код сервер
+  // отклоняет (410), а не выдаёт новую сессию.
   async function submitCode() {
     if (codeInput.length !== 6) return;
     redeeming = true; codeError = null; render();
-    try {
-      const res = await fetch('/api/pc/redeem-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: codeInput }),
-      });
-      const data = await res.json();
-      redeeming = false;
-      if (!res.ok) {
-        codeError = data.error || 'Код не найден или уже использован';
-        render();
-        return;
-      }
-      stationLabel = data.station.label;
-      hourlyTariff = data.station.tariffPerHour;
-      remainingMs = data.remainingMs;
-      sessionActive = true;
-      pushLog(`Код принят — сессия начата (${data.station.label})`);
+    const { ok, status, data, networkError } = await apiFetch('/api/pc/redeem-code', {
+      method: 'POST',
+      body: JSON.stringify({ code: codeInput }),
+    });
+    redeeming = false;
+    if (!ok) {
+      if (status === 401) { invalidateDeviceToken(); render(); return; }
+      codeError = networkError ? 'Нет связи с сервером — попробуйте ещё раз' : (data && data.error) || 'Код не найден или уже использован';
       render();
-    } catch {
-      redeeming = false;
-      codeError = 'Нет связи с сервером — попробуйте ещё раз';
-      render();
+      return;
     }
+    applySession(data);
+    codeInput = '';
+    screen = 'active';
+    pushLog(`Код принят — сессия начата (${data.stationLabel})`);
+    render();
   }
 
-  function buyPackage(pkg) {
-    if (balance < pkg.price) return;
-    balance -= pkg.price; remainingMs += pkg.minutes * 60000; modal = null;
-    pushLog(`Продление: −${pkg.price} ₽ (${pkg.label}) → +${pkg.minutes} мин`);
+  async function doExtend(minutes) {
+    if (extendPending || !sessionId) return;
+    extendPending = true; extendError = null; render();
+    const { ok, data, networkError } = await apiFetch(`/api/pc/session/${sessionId}/extend`, {
+      method: 'POST',
+      body: JSON.stringify({ minutes }),
+    });
+    extendPending = false;
+    if (!ok) {
+      extendError = networkError ? 'Нет связи с сервером' : (data && data.error) || 'Не удалось продлить';
+      render();
+      return;
+    }
+    applySession(data);
+    modal = null;
+    pushLog(`Продление: +${minutes} мин (баланс: ${balance} ₽)`);
     render();
   }
-  function buyMinutes(min) {
-    const price = minutePrice(min);
-    if (balance < price) return;
-    balance -= price; remainingMs += min * 60000; modal = null;
-    pushLog(`Продление: −${price} ₽ (${min} мин) → +${min} мин`);
-    render();
+  function buyPackage(pkg) { doExtend(pkg.minutes); }
+  function buyMinutes(min) { doExtend(min); }
+
+  function goToReport() {
+    if (!sessionId) return;
+    window.location.href = `/report.html?session=${sessionId}&from=widget`;
   }
-  function simulateSiteConfirmation() {
-    cleanConfirmed = true; pushLog('Чистота рабочего места подтверждена на сайте'); render();
-    setTimeout(() => { modal = null; sessionEnded = true; pushLog('Сессия завершена'); render(); }, 900);
-  }
+
   function confirmReboot() {
     modal = null; rebooting = true; pushLog('Ручной ребут запрошен гостем — сессия не прерывается'); render();
     setTimeout(() => { rebooting = false; pushLog('ПК перезагружен, сессия продолжается'); render(); }, 2200);
@@ -121,13 +197,16 @@
     supportSent = true; pushLog(`Заявка в техподдержку: ${supportReason}${supportMessage ? ' — ' + supportMessage : ''}`); render();
     setTimeout(() => { modal = null; render(); }, 1400);
   }
+  // Демо: QR/СБП-пополнение внутри виджета — оплата не проводится на сервере
+  // (реальный topup ещё не подключён к ПК-станции), меняем только то, что
+  // видно на экране, чтобы показать сценарий.
   function generateQr() {
     const amount = parseInt(topupInput, 10); if (!amount) return;
     topupAmount = amount; topupStage = 'waiting'; render();
     setTimeout(() => confirmTopUp(amount), 2600);
   }
   function confirmTopUp(amount) {
-    balance += amount; topupStage = 'paid'; pushLog(`Пополнение через СБП: +${amount} ₽`); render();
+    balance += amount; topupStage = 'paid'; pushLog(`Демо-пополнение (без записи на сервере): +${amount} ₽`); render();
     setTimeout(() => { modal = null; render(); }, 1100);
   }
 
@@ -146,12 +225,13 @@
     if (modal === 'extend') {
       const pkgCards = PACKAGES().map(pkg => {
         const affordable = balance >= pkg.price;
-        return `<button data-action="buyPackage" data-pkg="${pkg.id}" ${affordable ? '' : 'disabled'} style="text-align:left;padding:10px 11px;border-radius:10px;border:1px solid ${BORDER};background:${SURFACE_ALT};color:${affordable ? TEXT : TEXT_MUTED};cursor:${affordable ? 'pointer' : 'not-allowed'};opacity:${affordable ? 1 : 0.5};">
+        return `<button data-action="buyPackage" data-pkg="${pkg.id}" ${(affordable && !extendPending) ? '' : 'disabled'} style="text-align:left;padding:10px 11px;border-radius:10px;border:1px solid ${BORDER};background:${SURFACE_ALT};color:${affordable ? TEXT : TEXT_MUTED};cursor:${affordable ? 'pointer' : 'not-allowed'};opacity:${affordable ? 1 : 0.5};">
           <div style="font-size:13px;font-weight:600;">${pkg.label}</div>
           <div style="font-size:13px;font-family:${MONO};margin-top:4px;">${pkg.price} ₽</div>
         </button>`;
       }).join('');
       const price = minutePrice(extendMinutes);
+      const affordable = balance >= price;
       return modalWrap(`
         <div style="text-align:center;"><div style="font-size:15px;font-weight:600;">Продлить время</div><div style="font-size:12px;color:${TEXT_MUTED};margin-top:2px;">Баланс: ${balance} ₽ · тариф ${hourlyTariff} ₽/ч</div></div>
         <div style="font-size:12px;color:${TEXT_MUTED};margin:14px 0 6px;text-align:left;">Пакеты</div>
@@ -163,7 +243,8 @@
             <div style="flex:1;text-align:center;"><div style="font-family:${MONO};font-size:18px;font-weight:600;">${extendMinutes} мин</div><div style="font-family:${MONO};font-size:11.5px;color:${TEXT_MUTED};">${price} ₽</div></div>
             <button data-action="step" data-dir="1" style="${btn(SURFACE_ALT, TEXT, 'width:36px;')}">+</button>
           </div>
-          <button data-action="buyMinutes" ${balance < price ? 'disabled' : ''} style="width:100%;margin-top:10px;${btn(balance >= price ? ACCENT : SURFACE_ALT, balance >= price ? '#0B1D14' : TEXT_MUTED)}">Продлить на ${extendMinutes} мин</button>
+          <button data-action="buyMinutes" ${(affordable && !extendPending) ? '' : 'disabled'} style="width:100%;margin-top:10px;${btn(affordable ? ACCENT : SURFACE_ALT, affordable ? '#0B1D14' : TEXT_MUTED)}">${extendPending ? 'Продлеваем…' : `Продлить на ${extendMinutes} мин`}</button>
+          ${extendError ? `<div style="color:${ACCENT};font-size:12px;margin-top:8px;">${extendError}</div>` : ''}
         </div>`);
     }
     if (modal === 'end') {
@@ -171,10 +252,8 @@
         <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;">
           <div style="font-size:34px;">▦</div>
           <div style="font-size:15px;font-weight:600;">Подтвердите чистоту рабочего места</div>
-          <div style="font-size:13px;color:${TEXT_MUTED};">Отсканируйте код или откройте ссылку на сайте — сессия завершится автоматически.</div>
-          ${cleanConfirmed
-            ? `<div style="color:${OK};font-size:13px;">✓ Подтверждено, завершаем…</div>`
-            : `<button data-action="confirmClean" style="width:100%;${btn(SURFACE_ALT)}">Демо: подтвердить с сайта</button>`}
+          <div style="font-size:13px;color:${TEXT_MUTED};">Заполните короткий чек-лист и приложите 2 фото места — сессия завершится после отправки.</div>
+          <button data-action="goToReport" style="width:100%;${btn(ACCENT, '#0B1D14')}">Заполнить отчёт</button>
         </div>`);
     }
     if (modal === 'reboot') {
@@ -207,6 +286,7 @@
       if (topupStage === 'pick') {
         const amount = parseInt(topupInput, 10);
         body = `
+          <div style="font-size:11.5px;color:${TEXT_MUTED};background:${SURFACE_ALT};border:1px solid ${BORDER};border-radius:8px;padding:8px 10px;text-align:left;">Демо-режим — оплата не проводится, баланс на сервере не меняется</div>
           <div style="text-align:left;"><div style="font-size:12px;color:${TEXT_MUTED};margin-bottom:6px;">Сумма пополнения</div>
             <div style="display:flex;align-items:center;border:1px solid ${BORDER};border-radius:8px;background:${SURFACE_ALT};padding:10px 12px;">
               <input type="number" value="${topupInput}" data-action="topupInput" style="flex:1;background:transparent;border:none;outline:none;color:${TEXT};font-size:20px;font-weight:600;font-family:${MONO};">
@@ -225,17 +305,44 @@
           <div style="font-size:12.5px;color:${TEXT_MUTED};">Ждём оплату…</div>
           <button data-action="forceConfirm" style="width:100%;${btn(SURFACE_ALT, TEXT_MUTED, 'font-size:12px;')}">Демо: платёж пришёл</button>`;
       } else {
-        body = `<div style="color:${OK};font-size:14px;padding:10px 0;">✓ Баланс пополнен на ${topupAmount} ₽</div>`;
+        body = `<div style="color:${OK};font-size:14px;padding:10px 0;">✓ Баланс пополнен на ${topupAmount} ₽ (демо)</div>`;
       }
       return modalWrap(`<div style="text-align:center;display:flex;flex-direction:column;gap:10px;">${body}</div>`);
     }
     return '';
   }
 
+  function renderSetup() {
+    const root = document.getElementById('pcwRoot');
+    root.innerHTML = `
+      <div style="min-height:420px;background:linear-gradient(180deg,#1B2A4A 0%,#2C4770 38%,#5C7D9E 62%,#7FA06B 78%,#4C6B3C 100%);position:relative;overflow:hidden;font-family:${SANS};border-radius:12px;display:flex;align-items:center;justify-content:center;">
+        <div style="width:min(92%,340px);background:rgba(16,20,27,0.94);border:1px solid ${BORDER};border-radius:14px;padding:22px;text-align:center;">
+          <div style="font-size:13px;font-weight:600;color:${TEXT};margin-bottom:4px;">404 · настройка станции</div>
+          <div style="font-size:12px;color:${TEXT_MUTED};margin-bottom:18px;">Вставьте токен устройства, выданный админом в разделе «Устройства»</div>
+          <input id="pcwSetupInput" value="${setupInput}" placeholder="agentToken" autocomplete="off"
+            style="width:100%;text-align:center;background:${SURFACE_ALT};border:1px solid ${BORDER};border-radius:10px;color:${TEXT};font-family:${MONO};font-size:13px;padding:12px 10px;box-sizing:border-box;">
+          ${setupError ? `<div style="color:${ACCENT};font-size:12px;margin-top:10px;">${setupError}</div>` : ''}
+          <button data-action="saveSetup" ${(setupInput.trim() && !setupSaving) ? '' : 'disabled'} style="width:100%;margin-top:14px;${btn(setupInput.trim() ? ACCENT : SURFACE_ALT, setupInput.trim() ? '#0B1D14' : TEXT_MUTED)}">${setupSaving ? 'Проверяем…' : 'Сохранить'}</button>
+        </div>
+      </div>`;
+    const input = document.getElementById('pcwSetupInput');
+    input.focus();
+    input.setSelectionRange(setupInput.length, setupInput.length);
+  }
+
   function render() {
+    if (screen === 'setup') return renderSetup();
     const root = document.getElementById('pcwRoot');
 
-    if (!sessionActive) {
+    if (screen === 'checking') {
+      root.innerHTML = `
+        <div style="min-height:420px;background:linear-gradient(180deg,#1B2A4A 0%,#2C4770 38%,#5C7D9E 62%,#7FA06B 78%,#4C6B3C 100%);border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:${SANS};">
+          <div style="color:${TEXT_MUTED};font-size:13px;">Проверяем станцию…</div>
+        </div>`;
+      return;
+    }
+
+    if (screen === 'code') {
       root.innerHTML = `
         <div style="min-height:420px;background:linear-gradient(180deg,#1B2A4A 0%,#2C4770 38%,#5C7D9E 62%,#7FA06B 78%,#4C6B3C 100%);position:relative;overflow:hidden;font-family:${SANS};border-radius:12px;display:flex;align-items:center;justify-content:center;">
           <div style="width:min(92%,320px);background:rgba(16,20,27,0.94);border:1px solid ${BORDER};border-radius:14px;padding:22px;text-align:center;">
@@ -246,6 +353,7 @@
             ${codeError ? `<div style="color:${ACCENT};font-size:12px;margin-top:10px;">${codeError}</div>` : ''}
             <button data-action="submitCode" ${(codeInput.length === 6 && !redeeming) ? '' : 'disabled'} style="width:100%;margin-top:14px;${btn(codeInput.length === 6 ? ACCENT : SURFACE_ALT, codeInput.length === 6 ? '#0B1D14' : TEXT_MUTED)}">${redeeming ? 'Проверяем…' : 'Подтвердить'}</button>
             <div style="font-size:11px;color:${TEXT_MUTED};margin-top:12px;">Код — в личном кабинете после бронирования на вкладке «Сайт»</div>
+            <button data-action="openSetup" style="width:100%;margin-top:10px;background:transparent;border:none;color:${TEXT_MUTED};font-size:11px;cursor:pointer;text-decoration:underline;">Сменить токен станции</button>
           </div>
         </div>`;
       const input = document.getElementById('pcwCodeInput');
@@ -254,7 +362,8 @@
       return;
     }
 
-    const plannedEnd = new Date(Date.now() + remainingMs);
+    const remainingMs = getRemainingMs();
+    const plannedEnd = sessionEndsAt || new Date();
     root.innerHTML = `
       <div style="min-height:520px;background:linear-gradient(180deg,#1B2A4A 0%,#2C4770 38%,#5C7D9E 62%,#7FA06B 78%,#4C6B3C 100%);position:relative;overflow:hidden;font-family:${SANS};border-radius:12px;">
         <div style="position:absolute;bottom:0;left:0;right:0;height:34px;background:rgba(10,12,16,0.55);"></div>
@@ -304,14 +413,16 @@
     if (!el) return;
     const action = el.dataset.action;
     if (action === 'backdrop' && e.target !== el) return;
+    if (action === 'saveSetup') return saveDeviceToken();
+    if (action === 'openSetup') { invalidateDeviceToken(null); render(); return; }
     if (action === 'submitCode') return submitCode();
-    if (action === 'open') return openModal(el.dataset.modal);
+    if (action === 'open') { extendError = null; return openModal(el.dataset.modal); }
     if (action === 'close' || action === 'backdrop') return closeModal();
     if (action === 'minimize') { visible = !visible; return render(); }
     if (action === 'step') { extendMinutes = Math.max(MINUTE_STEP, extendMinutes + Number(el.dataset.dir) * MINUTE_STEP); return render(); }
     if (action === 'buyPackage') return buyPackage(PACKAGES().find(p => p.id === el.dataset.pkg));
     if (action === 'buyMinutes') return buyMinutes(extendMinutes);
-    if (action === 'confirmClean') return simulateSiteConfirmation();
+    if (action === 'goToReport') return goToReport();
     if (action === 'confirmReboot') return confirmReboot();
     if (action === 'setReason') { supportReason = el.dataset.reason; return render(); }
     if (action === 'sendSupport') return sendSupport();
@@ -321,15 +432,17 @@
   });
 
   root.addEventListener('input', (e) => {
-    const el = e.target.closest('[data-action], #pcwCodeInput');
+    const el = e.target.closest('[data-action], #pcwCodeInput, #pcwSetupInput');
     if (!el) return;
     if (el.id === 'pcwCodeInput') { codeInput = el.value.replace(/\D/g, '').slice(0, 6); codeError = null; render(); return; }
+    if (el.id === 'pcwSetupInput') { setupInput = el.value; render(); return; }
     if (el.dataset.action === 'topupInput') { topupInput = el.value.replace(/[^0-9]/g, ''); render(); }
     if (el.dataset.action === 'supportMessage') { supportMessage = el.value; }
   });
 
   root.addEventListener('keydown', (e) => {
     if (e.target?.id === 'pcwCodeInput' && e.key === 'Enter') submitCode();
+    if (e.target?.id === 'pcwSetupInput' && e.key === 'Enter') saveDeviceToken();
   });
 
   root.addEventListener('change', (e) => {
@@ -340,14 +453,17 @@
 
   function openModal(m) {
     modal = m;
-    if (m === 'end') cleanConfirmed = false;
     if (m === 'support') { supportReason = null; supportMessage = ''; supportSent = false; }
     if (m === 'topup') { topupStage = 'pick'; topupInput = '300'; }
     render();
   }
   function closeModal() { modal = null; render(); }
 
-  render();
+  if (screen === 'checking') {
+    checkSession();
+  } else {
+    render();
+  }
 })();
 
 </script>

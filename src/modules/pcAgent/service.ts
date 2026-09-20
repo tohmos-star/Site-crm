@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { DomainError, ForbiddenError, NotFoundError } from "../../lib/errors.js";
 import { SessionService } from "../bookings/session.service.js";
 import { TariffService } from "../tariffs/service.js";
+import { BalanceService } from "../balance/service.js";
 
 // Façade для pc-widget.html — авторизация по device-токену станции (см.
 // authenticateDevice в src/plugins/auth.ts), не по гостевому JWT. Гость на
@@ -10,10 +11,12 @@ import { TariffService } from "../tariffs/service.js";
 export class PcAgentService {
   private readonly sessions: SessionService;
   private readonly tariffs: TariffService;
+  private readonly balance: BalanceService;
 
   constructor(private readonly prisma: PrismaClient) {
     this.sessions = new SessionService(prisma);
     this.tariffs = new TariffService(prisma);
+    this.balance = new BalanceService(prisma);
   }
 
   async redeemCode(deviceId: string, code: string) {
@@ -71,12 +74,15 @@ export class PcAgentService {
       tariffPerHour = Math.round(Number(quote.price));
     }
 
+    const guestBalanceRub = Math.round(Number(await this.balance.getBalance(session.guestId, "MONEY")));
+
     return {
       id: session.id,
       status: session.status,
       stationLabel: session.device.name,
       endsAt: session.endsAt,
       tariffPerHour,
+      guestBalanceRub,
     };
   }
 }

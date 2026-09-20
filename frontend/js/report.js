@@ -91,6 +91,12 @@ async function handleSubmit(e) {
     statusEl.textContent = 'Отчёт принят и отправлен на проверку. Бонусы начислим после проверки.';
     statusEl.className = 'status-msg show ok';
     btn.textContent = 'Отправлено';
+
+    // Если открыто из оверлея станции (pc-widget.html) — вернёмся туда,
+    // чтобы киоск сбросился на экран ввода кода для следующего гостя.
+    if (new URLSearchParams(window.location.search).get('from') === 'widget') {
+      setTimeout(() => { window.location.href = '/pc-widget.html'; }, 1800);
+    }
   } catch (err) {
     statusEl.textContent = 'Не удалось отправить отчёт. Проверьте связь и попробуйте снова.';
     statusEl.className = 'status-msg show err';
