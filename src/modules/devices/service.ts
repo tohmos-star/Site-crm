@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type { DeviceStatus, PrismaClient } from "@prisma/client";
 import { DomainError, NotFoundError } from "../../lib/errors.js";
 import type { WakeOnLanPort } from "./wol.js";
@@ -81,5 +82,20 @@ export class DeviceService {
       throw new DomainError("NO_MAC", `Device ${id} has no MAC address configured`, 422);
     }
     await this.wol.wake(device.mac);
+  }
+
+  // Разовая выдача токена ПК-станции при настройке (см. authenticateDevice
+  // в src/plugins/auth.ts) — показывается админу один раз, дальше только
+  // перевыпуск (старый токен инвалидируется).
+  async issueAgentToken(id: string) {
+    await this.get(id);
+    const token = randomBytes(24).toString("base64url");
+    await this.prisma.device.update({ where: { id }, data: { agentToken: token } });
+    return { agentToken: token };
+  }
+
+  async revokeAgentToken(id: string) {
+    await this.get(id);
+    await this.prisma.device.update({ where: { id }, data: { agentToken: null } });
   }
 }

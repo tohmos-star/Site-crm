@@ -234,12 +234,24 @@ export class SessionService {
     });
   }
 
-  async complete(sessionId: string) {
+  async complete(
+    sessionId: string,
+    report?: { cleanDesk: boolean; cleanPc: boolean; cleanHeadset: boolean; photoPaths: string[] },
+  ) {
     const session = await this.get(sessionId);
     return this.prisma.$transaction(async (tx) => {
       const completed = await tx.session.update({
         where: { id: sessionId },
-        data: { status: "COMPLETED", completedAt: new Date() },
+        data: {
+          status: "COMPLETED",
+          completedAt: new Date(),
+          ...(report && {
+            reportCleanDesk: report.cleanDesk,
+            reportCleanPc: report.cleanPc,
+            reportCleanHeadset: report.cleanHeadset,
+            reportPhotoPaths: report.photoPaths,
+          }),
+        },
       });
       await tx.device.update({ where: { id: session.deviceId }, data: { status: "FREE" } });
       if (session.bookingId) {

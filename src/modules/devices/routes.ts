@@ -77,6 +77,22 @@ const deviceRoutes: FastifyPluginAsync = async (fastify) => {
       return { ok: true };
     },
   });
+
+  // Разовая выдача device-токена станции при настройке ПК-агента — см.
+  // authenticateDevice в src/plugins/auth.ts. Показывается один раз в
+  // ответе, дальше только перевыпуск.
+  fastify.post("/devices/:id/agent-token", {
+    schema: { params: DeviceParams },
+    handler: async (request) => service.issueAgentToken((request.params as { id: string }).id),
+  });
+
+  fastify.delete("/devices/:id/agent-token", {
+    schema: { params: DeviceParams },
+    handler: async (request, reply) => {
+      await service.revokeAgentToken((request.params as { id: string }).id);
+      reply.code(204);
+    },
+  });
 };
 
 export default deviceRoutes;

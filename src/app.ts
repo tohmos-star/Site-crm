@@ -20,6 +20,9 @@ import refundRoutes from "./modules/refunds/routes.js";
 import paymentRoutes from "./modules/payments/routes.js";
 import authRoutes from "./modules/auth/routes.js";
 import adminGuestsRoutes from "./modules/adminGuests/routes.js";
+import appFacadeRoutes from "./modules/appFacade/routes.js";
+import pcAgentRoutes from "./modules/pcAgent/routes.js";
+import sessionReportsRoutes from "./modules/sessionReports/routes.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -77,8 +80,12 @@ export async function buildApp() {
   await app.register(adminGuestsRoutes, { prefix: "/api" });
 
   // Весь административный CRUD (зоны/устройства/тарифы/лояльность/возвраты/
-  // клубы/сырые /guests/баланс) — только через админ-JWT. См. AskUserQuestion
-  // в истории сессии: "всё администрирование через сайт".
+  // клубы/сырые /guests/баланс, сырой bookings/sessions CRUD для ресепшена)
+  // — только через админ-JWT. См. AskUserQuestion в истории сессии: "всё
+  // администрирование через сайт". Сырой bookingRoutes живёт тут под
+  // /api/admin/*, чтобы не конфликтовать по путям с гостевой façade ниже
+  // (/api/bookings*) и ПК-агентом (/api/pc/*), которые бьют по тем же
+  // сущностям с другой авторизацией.
   await app.register(
     async (adminScope) => {
       adminScope.addHook("preHandler", adminScope.authenticateAdmin);
@@ -91,22 +98,26 @@ export async function buildApp() {
       await adminScope.register(loyaltyRoutes);
       await adminScope.register(refundRoutes);
       await adminScope.register(paymentRoutes);
+      await adminScope.register(bookingRoutes, { prefix: "/admin" });
     },
     { prefix: "/api" },
   );
 
-  // ВРЕМЕННО за admin-JWT: реальным вызывающим тут должны быть гость (JWT,
-  // façade "быстрая бронь" — Increment 2) и ПК-агент (agentToken — Increment
-  // 2, authenticateDevice уже есть в src/plugins/auth.ts). Пока эта проводка
-  // не сделана, лучше держать финансовые ручки за каким-то auth, чем
-  // полностью открытыми.
-  await app.register(
-    async (bookingScope) => {
-      bookingScope.addHook("preHandler", bookingScope.authenticateAdmin);
-      await bookingScope.register(bookingRoutes);
-    },
-    { prefix: "/api" },
-  );
+  // Гостевая façade "быстрая бронь" (см. Zone.defaultTariffId) поверх
+  // реального Device/Booking-домена — под форму, которую уже ждут
+  // frontend/js/booking.js и Android GuestRepository. Авторизация: гостевой
+  // JWT (authenticateGuest внутри routes.ts), кроме GET /stations.
+  await app.register(appFacadeRoutes, { prefix: "/api" });
+
+  // ПК-виджет станции (pc-widget.html) — авторизация по device-токену
+  // станции (authenticateDevice), не по гостевому JWT: гость на станции
+  // ничего не логинит, только вводит код брони.
+  await app.register(pcAgentRoutes, { prefix: "/api" });
+
+  // Отчёт о чистоте места при завершении сессии (report.html) — публичный,
+  // frontend/js/report.js не шлёт auth-заголовок; sessionId сам по себе
+  // разовый предъявитель, как код брони.
+  await app.register(sessionReportsRoutes, { prefix: "/api" });
 
   return app;
 }
