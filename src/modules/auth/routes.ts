@@ -106,6 +106,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         phone: guest.phone,
         fio: guest.fullName,
         balanceRub: await service.guestBalanceRub(guest.id),
+        bonusPoints: await service.guestBonusPoints(guest.id),
       };
     },
   });

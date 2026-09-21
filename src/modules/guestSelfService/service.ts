@@ -189,6 +189,7 @@ export class GuestSelfServiceService {
     return {
       id: session.id,
       status: session.status,
+      stationId: session.deviceId,
       stationLabel: session.device.name,
       endsAt: session.endsAt,
       tariffPerHour,

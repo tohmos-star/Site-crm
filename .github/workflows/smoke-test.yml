@@ -83,5 +83,9 @@ jobs:
           check_guest_route_exists GET /api/sessions/active
           check_guest_route_exists POST /api/topup '{"amount":100}'
           check_guest_route_exists GET /api/refund-requests
-          check_guest_route_exists GET /api/loyalty-tiers
-          echo "OK: all guest self-service routes are registered and guarded"
+          echo "OK: all guest-authed self-service routes are registered and guarded"
+
+          # /loyalty-tiers нарочно публичный (как /api/stations) — приложение
+          # показывает каталог уровней ещё до логина.
+          echo "== GET /api/loyalty-tiers (public) =="
+          curl -fsS "$BASE/api/loyalty-tiers" | jq '. | length'

@@ -86,6 +86,11 @@ export class AuthService {
     return Number(money);
   }
 
+  async guestBonusPoints(guestId: string): Promise<number> {
+    const bonus = await this.balance.getBalance(guestId, "BONUS");
+    return Number(bonus);
+  }
+
   listRegistrations(status: "PENDING" | "APPROVED" | "REJECTED") {
     return this.prisma.guest.findMany({
       where: { regStatus: status, passwordHash: { not: null } },

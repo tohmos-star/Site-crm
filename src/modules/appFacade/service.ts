@@ -79,7 +79,9 @@ export class AppFacadeService {
     return Promise.all(
       bookings.map(async (b) => ({
         id: b.id,
+        stationId: b.deviceId,
         station: { label: b.device.name },
+        status: b.status,
         code: b.code,
         startAt: b.startAt,
         minutesPaid: b.paidMinutes,
