@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { NotFoundError } from "../../lib/errors.js";
+import { assignRandomDoorCode } from "../../lib/doorCode.js";
 import type { GuestBody } from "./schemas.js";
 
 export class GuestService {
@@ -19,11 +20,13 @@ export class GuestService {
     return guest;
   }
 
-  create(body: GuestBody) {
+  async create(body: GuestBody) {
+    const doorCode = await assignRandomDoorCode(this.prisma);
     return this.prisma.guest.create({
       data: {
         ...body,
         birthDate: body.birthDate ? new Date(body.birthDate) : undefined,
+        doorCode,
       },
     });
   }

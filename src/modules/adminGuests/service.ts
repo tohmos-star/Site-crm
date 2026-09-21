@@ -1,5 +1,6 @@
 import type { Guest, PrismaClient } from "@prisma/client";
 import { DomainError, NotFoundError } from "../../lib/errors.js";
+import { assignRandomDoorCode } from "../../lib/doorCode.js";
 import { BalanceService } from "../balance/service.js";
 import type { CreateGuestBody, UpdateGuestBody } from "./schemas.js";
 
@@ -23,6 +24,7 @@ export class AdminGuestsService {
   }
 
   async create(body: CreateGuestBody) {
+    const doorCode = await assignRandomDoorCode(this.prisma);
     const guest = await this.prisma.guest.create({
       data: {
         phone: body.phone,
@@ -31,6 +33,7 @@ export class AdminGuestsService {
         // без анкеты/фото/пароля. Войти по паролю такой гость не сможет,
         // пока не пройдёт обычную регистрацию сам.
         regStatus: "APPROVED",
+        doorCode,
       },
     });
     return this.toFacade(guest);
@@ -93,6 +96,7 @@ export class AdminGuestsService {
       phone: guest.phone,
       fio: guest.fullName,
       bonusPoints: Number(bonus),
+      doorCode: guest.doorCode,
       verification:
         guest.regStatus === "PENDING" || guest.regStatus === "REJECTED" || guest.passwordHash
           ? { status: guest.regStatus.toLowerCase() }

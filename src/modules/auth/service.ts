@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { FastifyInstance } from "fastify";
 import { DomainError, NotFoundError, UnauthorizedError } from "../../lib/errors.js";
 import { hashPassword, verifyPassword } from "../../lib/password.js";
+import { assignRandomDoorCode } from "../../lib/doorCode.js";
 import { BalanceService } from "../balance/service.js";
 
 export interface RegisterInput {
@@ -48,6 +49,7 @@ export class AuthService {
     }
 
     const passwordHash = await hashPassword(input.password);
+    const doorCode = await assignRandomDoorCode(this.prisma);
     return this.prisma.guest.create({
       data: {
         phone: input.phone,
@@ -56,6 +58,7 @@ export class AuthService {
         docPhotoPath: input.docPhotoPath,
         selfiePhotoPath: input.selfiePhotoPath,
         regStatus: "PENDING",
+        doorCode,
       },
     });
   }

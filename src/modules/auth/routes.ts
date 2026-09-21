@@ -113,11 +113,16 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get("/entry-access", {
     preHandler: fastify.authenticateGuest,
-    handler: async () => {
+    handler: async (request) => {
       const club = await service.getSingleClub();
-      // Гостю показываем один код (frontend/entry.html и Android ждут строку) —
-      // до 10 одновременно действующих кодов задаются только в админке.
-      return { intercomUrl: club.intercomUrl ?? "", doorCodeMain: club.doorCodeMain[0] ?? "" };
+      let guest = await fastify.prisma.guest.findUniqueOrThrow({ where: { id: request.guestId! } });
+      // Догоняем назначение для гостей, созданных до этой фичи (или когда
+      // при их создании пул кодов ещё был пуст) — раз код(ы) уже есть.
+      if (!guest.doorCode && club.doorCodeMain.length) {
+        const doorCode = club.doorCodeMain[Math.floor(Math.random() * club.doorCodeMain.length)];
+        guest = await fastify.prisma.guest.update({ where: { id: guest.id }, data: { doorCode } });
+      }
+      return { intercomUrl: club.intercomUrl ?? "", doorCodeMain: guest.doorCode ?? club.doorCodeMain[0] ?? "" };
     },
   });
 
@@ -154,6 +159,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         documentPhotoUrl: g.docPhotoPath ? `/uploads/${g.docPhotoPath}` : null,
         selfiePhotoUrl: g.selfiePhotoPath ? `/uploads/${g.selfiePhotoPath}` : null,
         status: g.regStatus.toLowerCase(),
+        doorCode: g.doorCode,
       }));
     },
   });

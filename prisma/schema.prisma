@@ -289,6 +289,10 @@ model Guest {
   // src/lib/uploads.ts), проверяются админом при разборе анкеты.
   docPhotoPath    String?
   selfiePhotoPath String?
+  // Один из Club.doorCodeMain (до 10 кодов) — назначается случайно один раз
+  // при создании гостя (см. src/lib/doorCode.ts) и больше не меняется;
+  // видно админу в анкете/карточке гостя, гостю — в /api/entry-access.
+  doorCode        String?
   createdAt       DateTime       @default(now())
 
   manualGroupId String?

@@ -57,14 +57,14 @@ function initTabs() {
 async function loadRegistrations() {
   const status = document.getElementById('vStatusFilter').value;
   const tbody = document.getElementById('vTableBody');
-  tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);">Загрузка…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);">Загрузка…</td></tr>';
 
   try {
     const res = await adminFetch(`/api/admin/registrations?status=${status}`);
     const rows = await res.json();
 
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);">Пусто</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);">Пусто</td></tr>';
       return;
     }
 
@@ -77,6 +77,7 @@ async function loadRegistrations() {
           <a class="thumb-link" href="${r.documentPhotoUrl}" target="_blank" rel="noopener">документ</a> ·
           <a class="thumb-link" href="${r.selfiePhotoUrl}" target="_blank" rel="noopener">селфи</a>
         </td>
+        <td>${r.doorCode ? escapeHtml(r.doorCode) : '<span style="color:var(--text-muted);">—</span>'}</td>
         <td>
           ${r.status === 'pending' ? `
             <div class="row-actions">
@@ -103,7 +104,7 @@ async function loadRegistrations() {
     });
   } catch (err) {
     if (err.message !== 'unauthorized' && err.message !== 'no token') {
-      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--accent);">Не удалось загрузить</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="color:var(--accent);">Не удалось загрузить</td></tr>';
     }
   }
 }
@@ -204,7 +205,7 @@ function initAccessForm() {
 
 async function loadGuests(search) {
   const tbody = document.getElementById('gTableBody');
-  tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);">Загрузка…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);">Загрузка…</td></tr>';
 
   try {
     const url = search ? `/api/admin/guests?search=${encodeURIComponent(search)}` : '/api/admin/guests';
@@ -212,7 +213,7 @@ async function loadGuests(search) {
     const guests = await res.json();
 
     if (!guests.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);">Никого не найдено</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);">Никого не найдено</td></tr>';
       return;
     }
 
@@ -221,6 +222,7 @@ async function loadGuests(search) {
         <td><input type="tel" value="${escapeHtml(g.phone)}" data-field="phone" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:5px 7px; width:130px; font-size:12px;"></td>
         <td><input type="text" value="${escapeHtml(g.fio || '')}" data-field="fio" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:5px 7px; width:160px; font-size:12px;"></td>
         <td><input type="number" value="${g.bonusPoints}" data-field="bonusPoints" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:5px 7px; width:70px; font-size:12px;"></td>
+        <td>${g.doorCode ? escapeHtml(g.doorCode) : '<span style="color:var(--text-muted);">—</span>'}</td>
         <td><span class="badge">${g.verification ? g.verification.status : 'нет анкеты'}</span></td>
         <td>
           <div class="row-actions">
@@ -230,7 +232,7 @@ async function loadGuests(search) {
           </div>
         </td>
       </tr>
-      <tr class="g-history-row" data-history-row="${g.id}" style="display:none;"><td colspan="5"></td></tr>
+      <tr class="g-history-row" data-history-row="${g.id}" style="display:none;"><td colspan="6"></td></tr>
     `).join('');
 
     tbody.querySelectorAll('[data-save-guest]').forEach(btn => {
@@ -244,7 +246,7 @@ async function loadGuests(search) {
     });
   } catch (err) {
     if (err.message !== 'unauthorized' && err.message !== 'no token') {
-      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--accent);">Не удалось загрузить</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="color:var(--accent);">Не удалось загрузить</td></tr>';
     }
   }
 }
