@@ -89,3 +89,6 @@ jobs:
           # показывает каталог уровней ещё до логина.
           echo "== GET /api/loyalty-tiers (public) =="
           curl -fsS "$BASE/api/loyalty-tiers" | jq '. | length'
+
+          echo "== GET /api/admin/access-credential (doorCodeMain должен быть массивом, doorCodeSecond быть не должно) =="
+          curl -fsS "$BASE/api/admin/access-credential" -H "Authorization: Bearer $TOKEN" | jq '{doorCodeMain, hasSecondField: has("doorCodeSecond")}'
