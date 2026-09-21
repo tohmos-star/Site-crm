@@ -1,0 +1,68 @@
+name: Deploy CRM to server
+
+# Деплоит backend+frontend (docker-compose.yml: postgres + app) на боевой
+# сервер по SSH. Ветка не дефолтная, поэтому workflow_dispatch недоступен,
+# пока файл не попадёт хотя бы раз в default branch — тригеримся на push
+# в саму ветку, как и .github/workflows/android-apk.yml.
+on:
+  push:
+    branches:
+      - claude/crm-server-deployment-bmkzrr
+    paths:
+      - "src/**"
+      - "prisma/**"
+      - "frontend/**"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "deploy/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          if [ -z "$SSH_PRIVATE_KEY" ] || [ -z "$SSH_HOST" ]; then
+            echo "SSH_PRIVATE_KEY / SSH_HOST secrets are not set" >&2
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${{ secrets.SSH_PORT || '22' }}" "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Rsync repo to server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -p ${SSH_PORT} -o StrictHostKeyChecking=yes" \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='dist' \
+            --exclude='android' \
+            --exclude='.env' \
+            ./ "${SSH_USER}@${SSH_HOST}:/opt/404-crm/"
+
+      - name: Run deploy.sh on server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${SSH_PORT}" "${SSH_USER}@${SSH_HOST}" \
+            "cd /opt/404-crm && JWT_SECRET='${JWT_SECRET}' POSTGRES_PASSWORD='${POSTGRES_PASSWORD}' bash deploy/deploy.sh"
