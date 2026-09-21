@@ -1,0 +1,42 @@
+name: Bootstrap SSH deploy key (one-time)
+
+# Разовый шаг: пока сервер ещё не принимает deploy.yml по SSH_PRIVATE_KEY,
+# логинимся паролем (SSH_PASSWORD) и дописываем публичный ключ в
+# authorized_keys. Как и deploy.yml — тригер на push, т.к. workflow_dispatch
+# недоступен вне дефолтной ветки. Идемпотентен (grep перед append), но сам
+# файл должен быть удалён из репозитория сразу после того, как обычный
+# деплой по ключу заработает — секрет с паролем больше не нужен.
+on:
+  push:
+    branches:
+      - claude/crm-server-deployment-bmkzrr
+    paths:
+      - ".github/workflows/bootstrap-ssh-key.yml"
+  workflow_dispatch: {}
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install sshpass
+        run: sudo apt-get update -y && sudo apt-get install -y sshpass
+
+      - name: Trust server host key
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${{ secrets.SSH_PORT || '22' }}" "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Append deploy public key to authorized_keys
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          DEPLOY_PUBKEY: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDJl/9Q7InZ+JSqKnyMsmKMNF0FcjHSNl9bjmUzPrC9Z claude-crm-deploy"
+        run: |
+          sshpass -p "$SSH_PASSWORD" ssh -p "$SSH_PORT" "${SSH_USER}@${SSH_HOST}" \
+            "mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && \
+             grep -qxF '$DEPLOY_PUBKEY' ~/.ssh/authorized_keys || echo '$DEPLOY_PUBKEY' >> ~/.ssh/authorized_keys && \
+             chmod 600 ~/.ssh/authorized_keys && echo 'authorized_keys updated'"
