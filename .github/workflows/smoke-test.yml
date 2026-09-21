@@ -94,4 +94,13 @@ jobs:
           curl -fsS "$BASE/api/admin/access-credential" -H "Authorization: Bearer $TOKEN" | jq '{doorCodeMain, hasSecondField: has("doorCodeSecond")}'
 
           echo "== GET /api/admin/guests (ожидаем поле doorCode у каждого гостя) =="
-          curl -fsS "$BASE/api/admin/guests" -H "Authorization: Bearer $TOKEN" | jq '[.[] | {phone, doorCode}]'
+          GUESTS=$(curl -fsS "$BASE/api/admin/guests" -H "Authorization: Bearer $TOKEN")
+          echo "$GUESTS" | jq '[.[] | {phone, doorCode}]'
+
+          NO_CODE_ID=$(echo "$GUESTS" | jq -r '[.[] | select(.doorCode == null)][0].id // empty')
+          if [ -n "$NO_CODE_ID" ]; then
+            echo "== POST /api/admin/guests/$NO_CODE_ID/assign-door-code =="
+            curl -fsS -X POST "$BASE/api/admin/guests/$NO_CODE_ID/assign-door-code" -H "Authorization: Bearer $TOKEN" | jq '{id, doorCode}'
+          else
+            echo "== Нет гостей с doorCode: null — пропускаю проверку назначения =="
+          fi
