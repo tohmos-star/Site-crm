@@ -121,19 +121,61 @@ async function reviewRegistration(id, status, rejectReason) {
 // 2. Домофон и коды
 // ---------------------------------------------------------------------
 
+const MAX_DOOR_CODES = 10;
+
+function renderDoorCodeRows(codes) {
+  const container = document.getElementById('accDoorCodes');
+  container.innerHTML = '';
+  const list = codes.length ? codes : [''];
+  list.forEach((code) => addDoorCodeRow(code));
+  updateAccAddCodeVisibility();
+}
+
+function addDoorCodeRow(value) {
+  const container = document.getElementById('accDoorCodes');
+  if (container.children.length >= MAX_DOOR_CODES) return;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:8px;';
+  row.innerHTML = `
+    <input type="text" class="acc-door-code" placeholder="1234567#" style="flex:1;" value="${(value || '').replace(/"/g, '&quot;')}">
+    <button type="button" class="btn btn-ghost acc-door-code-remove" style="padding:6px 10px; font-size:13px;">×</button>
+  `;
+  row.querySelector('.acc-door-code-remove').addEventListener('click', () => {
+    row.remove();
+    if (!container.children.length) addDoorCodeRow('');
+    updateAccAddCodeVisibility();
+  });
+  container.appendChild(row);
+}
+
+function updateAccAddCodeVisibility() {
+  const container = document.getElementById('accDoorCodes');
+  document.getElementById('accAddCode').style.display = container.children.length >= MAX_DOOR_CODES ? 'none' : '';
+}
+
+function collectDoorCodes() {
+  return Array.from(document.querySelectorAll('.acc-door-code'))
+    .map((input) => input.value.trim())
+    .filter(Boolean);
+}
+
 async function loadAccessCredential() {
   try {
     const res = await adminFetch('/api/admin/access-credential');
     const data = await res.json();
     if (data) {
       document.getElementById('accIntercom').value = data.intercomUrl || '';
-      document.getElementById('accDoorMain').value = data.doorCodeMain || '';
-      document.getElementById('accDoorSecond').value = data.doorCodeSecond || '';
+      renderDoorCodeRows(Array.isArray(data.doorCodeMain) ? data.doorCodeMain : []);
     }
   } catch { /* handled by adminFetch redirect */ }
 }
 
 function initAccessForm() {
+  document.getElementById('accAddCode').addEventListener('click', () => {
+    addDoorCodeRow('');
+    updateAccAddCodeVisibility();
+  });
+
   document.getElementById('accessForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const statusEl = document.getElementById('accessStatus');
@@ -143,8 +185,7 @@ function initAccessForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           intercomUrl: document.getElementById('accIntercom').value.trim(),
-          doorCodeMain: document.getElementById('accDoorMain').value.trim(),
-          doorCodeSecond: document.getElementById('accDoorSecond').value.trim() || undefined,
+          doorCodeMain: collectDoorCodes(),
         }),
       });
       if (!res.ok) throw new Error();

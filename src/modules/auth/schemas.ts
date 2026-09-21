@@ -27,7 +27,6 @@ export type RegistrationsQuery = Static<typeof RegistrationsQuery>;
 
 export const AccessCredentialBody = Type.Object({
   intercomUrl: Type.String(),
-  doorCodeMain: Type.String(),
-  doorCodeSecond: Type.Optional(Type.String()),
+  doorCodeMain: Type.Array(Type.String(), { maxItems: 10 }),
 });
 export type AccessCredentialBody = Static<typeof AccessCredentialBody>;

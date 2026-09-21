@@ -115,7 +115,9 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     preHandler: fastify.authenticateGuest,
     handler: async () => {
       const club = await service.getSingleClub();
-      return { intercomUrl: club.intercomUrl ?? "", doorCodeMain: club.doorCodeMain ?? "" };
+      // Гостю показываем один код (frontend/entry.html и Android ждут строку) —
+      // до 10 одновременно действующих кодов задаются только в админке.
+      return { intercomUrl: club.intercomUrl ?? "", doorCodeMain: club.doorCodeMain[0] ?? "" };
     },
   });
 
@@ -174,7 +176,6 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       return {
         intercomUrl: club.intercomUrl,
         doorCodeMain: club.doorCodeMain,
-        doorCodeSecond: club.doorCodeSecond,
       };
     },
   });
@@ -183,20 +184,21 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     preHandler: fastify.authenticateAdmin,
     schema: { body: AccessCredentialBody },
     handler: async (request) => {
-      const body = request.body as { intercomUrl: string; doorCodeMain: string; doorCodeSecond?: string };
+      const body = request.body as { intercomUrl: string; doorCodeMain: string[] };
+      // Схема уже режет длину массива до 10 (maxItems), но не убирает пустые
+      // строки/дубли, которые UI может прислать (пустые поля-строки) — чистим здесь.
+      const doorCodeMain = [...new Set(body.doorCodeMain.map((c) => c.trim()).filter(Boolean))].slice(0, 10);
       const club = await service.getSingleClub();
       const updated = await fastify.prisma.club.update({
         where: { id: club.id },
         data: {
           intercomUrl: body.intercomUrl,
-          doorCodeMain: body.doorCodeMain,
-          doorCodeSecond: body.doorCodeSecond ?? null,
+          doorCodeMain,
         },
       });
       return {
         intercomUrl: updated.intercomUrl,
         doorCodeMain: updated.doorCodeMain,
-        doorCodeSecond: updated.doorCodeSecond,
       };
     },
   });

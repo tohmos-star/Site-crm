@@ -25,14 +25,12 @@ model Club {
   // "Войти в клуб" (frontend/entry.html) + админ-вкладка "Домофон и коды"
   // (frontend/admin/app.js): единый общеклубный доступ, который админ
   // руками задаёт и меняет — НЕ код на гостя, несмотря на текст на сайте
-  // ("персональный, сгенерирован для вас") — реальный /api/admin/access-
-  // credential модель именно такая: один intercomUrl + doorCodeMain
-  // (обязательный) + doorCodeSecond (опциональный, напр. на переходный
-  // период смены кода).
-  intercomUrl    String?
-  doorCodeMain   String?
-  doorCodeSecond String?
-  createdAt      DateTime @default(now())
+  // ("персональный, сгенерирован для вас"). doorCodeMain — до 10
+  // одновременно действующих кодов (лимит проверяется в PUT
+  // /admin/access-credential); гостю (GET /entry-access) отдаётся первый.
+  intercomUrl  String?
+  doorCodeMain String[] @default([])
+  createdAt    DateTime @default(now())
 
   zones          Zone[]
   devices        Device[]

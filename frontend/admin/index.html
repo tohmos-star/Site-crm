@@ -72,8 +72,11 @@
       <div class="form-panel" style="max-width:480px;">
         <form id="accessForm">
           <div class="field"><label>Ссылка на домофон</label><input type="text" id="accIntercom" placeholder="https://domovoy.city/skud/link/?token=..."></div>
-          <div class="field"><label>Код основной двери</label><input type="text" id="accDoorMain" placeholder="1234567#"></div>
-          <div class="field"><label>Код второй двери (если есть)</label><input type="text" id="accDoorSecond" placeholder="необязательно"></div>
+          <div class="field">
+            <label>Коды двери (до 10 одновременно действующих)</label>
+            <div id="accDoorCodes"></div>
+            <button type="button" class="btn btn-ghost" id="accAddCode" style="margin-top:8px; padding:6px 12px; font-size:13px;">+ Добавить код</button>
+          </div>
           <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Сохранить</button>
           <div class="status-msg" id="accessStatus"></div>
         </form>
