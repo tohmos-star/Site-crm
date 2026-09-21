@@ -49,7 +49,11 @@ echo "==> Прогоняю миграции Prisma"
 $SUDO docker compose run --rm app npx prisma migrate deploy
 
 echo "==> Прогоняю seed (идемпотентно — создаёт клуб/зоны/тарифы и дефолтного админа при первом запуске)"
-$SUDO docker compose --profile tools run --rm seed
+# --build обязателен: без него compose переиспользует уже собранный образ
+# seed с прошлого деплоя (даже если Dockerfile/schema.prisma поменялись),
+# и его Prisma Client рассинхронизируется с реальной БД после миграции —
+# см. коммит с массивом кодов двери, который на этом словил P2022.
+$SUDO docker compose --profile tools run --build --rm seed
 
 echo "==> Поднимаю app"
 $SUDO docker compose up -d app
