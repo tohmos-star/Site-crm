@@ -93,7 +93,7 @@ class MockGuestRepository : GuestRepository {
         return Result.success(guest)
     }
 
-    override suspend fun register(phone: String, password: String, fio: String): Result<Guest> {
+    override suspend fun register(phone: String, password: String, fio: String, docPhoto: android.graphics.Bitmap?, selfiePhoto: android.graphics.Bitmap?): Result<Guest> {
         delay(300)
         if (guests.any { it.phone == phone.trim() }) {
             return Result.failure(IllegalArgumentException("Такой телефон уже зарегистрирован"))
@@ -283,7 +283,12 @@ class MockGuestRepository : GuestRepository {
         return Result.success(Unit)
     }
 
-    override suspend fun endActiveSessionWithReport(): Result<Unit> {
+    override suspend fun endActiveSessionWithReport(
+        cleanDesk: Boolean,
+        cleanPc: Boolean,
+        cleanHeadset: Boolean,
+        photos: List<android.graphics.Bitmap>,
+    ): Result<Unit> {
         delay(400)
         val booking = activeBooking() ?: return Result.failure(IllegalStateException("Нет активной сессии"))
         booking.status = BookingStatus.COMPLETED

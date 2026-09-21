@@ -35,6 +35,10 @@ data class Station(
     // Назначенный тариф из сетки — если null, цена считается по tariffPerHour
     // (как в backend/src/modules/tariffs: flat vs grid), см. MockGuestRepository.quoteBooking.
     val tariffId: String? = null,
+    // DeviceStatus с backend'а (FREE/BUSY/CONNECTING/...) — MockGuestRepository
+    // не отслеживает реальный статус, у него freeStationsNow() считает занятость
+    // по своим локальным bookings.
+    val status: String = "FREE",
 )
 
 // COMPLETED — гость сам завершил сессию досрочно через виджет (после

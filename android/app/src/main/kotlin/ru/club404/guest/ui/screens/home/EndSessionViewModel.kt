@@ -44,7 +44,13 @@ class EndSessionViewModel(private val repository: GuestRepository) : ViewModel()
         if (!_state.value.canSubmit) return
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
-            val result = repository.endActiveSessionWithReport()
+            val s = _state.value
+            val result = repository.endActiveSessionWithReport(
+                cleanDesk = s.checkDesk,
+                cleanPc = s.checkPc,
+                cleanHeadset = s.checkHeadset,
+                photos = listOfNotNull(s.photo0, s.photo1, s.photo2),
+            )
             result.fold(
                 onSuccess = { _state.update { it.copy(loading = false, done = true) } },
                 onFailure = { e -> _state.update { it.copy(loading = false, error = e.message ?: "Не удалось отправить отчёт") } },

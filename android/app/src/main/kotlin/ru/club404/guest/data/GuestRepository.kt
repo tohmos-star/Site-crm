@@ -1,15 +1,16 @@
 package ru.club404.guest.data
 
+import android.graphics.Bitmap
 import kotlinx.coroutines.flow.StateFlow
 import java.time.Instant
 
 /**
- * Единая точка доступа к данным для всех экранов. Сейчас — только
- * [MockGuestRepository] с данными в памяти (сознательный выбор для первой
- * версии приложения — см. README в этом модуле). Когда бэкенд будет готов,
- * добавляется RemoteGuestRepository с тем же интерфейсом на Retrofit/Ktor,
- * и экраны/ViewModel'и не меняются вообще — это ради этого интерфейс и
- * заведён, по аналогии с LLMClient/PaymentProvider в backend-модулях сайта.
+ * Единая точка доступа к данным для всех экранов. Есть две реализации:
+ * [MockGuestRepository] (данные в памяти, для демо без сети) и
+ * [RemoteGuestRepository] (реальный backend, см. ../../../../../../src в
+ * этом же репозитории) — экраны/ViewModel'и не знают, какая именно
+ * подключена, это ради этого интерфейс и заведён, по аналогии с
+ * LLMClient/PaymentProvider в backend-модулях сайта.
  */
 interface GuestRepository {
 
@@ -26,7 +27,9 @@ interface GuestRepository {
     // Как на сайте — регистрация НЕ логинит гостя автоматически, анкета
     // уходит "на проверку" (см. RegStatus). Вызывающая сторона переводит UI
     // на экран ожидания сама; войти можно отдельным вызовом login().
-    suspend fun register(phone: String, password: String, fio: String): Result<Guest>
+    // docPhoto/selfiePhoto обязательны для настоящего backend (KYC — см.
+    // POST /api/registrations), MockGuestRepository их просто игнорирует.
+    suspend fun register(phone: String, password: String, fio: String, docPhoto: Bitmap?, selfiePhoto: Bitmap?): Result<Guest>
     fun logout()
 
     fun bookingsForCurrentGuest(): StateFlow<List<Booking>>
@@ -66,8 +69,15 @@ interface GuestRepository {
 
     // Досрочное завершение сессии гостем через виджет — только после
     // подтверждения чистоты места (см. EndSessionScreen); истечение
-    // оплаченного времени само по себе сюда не попадает.
-    suspend fun endActiveSessionWithReport(): Result<Unit>
+    // оплаченного времени само по себе сюда не попадает. Чек-лист и минимум
+    // 2 фото обязательны для настоящего backend (POST /api/session-reports),
+    // MockGuestRepository их просто игнорирует.
+    suspend fun endActiveSessionWithReport(
+        cleanDesk: Boolean,
+        cleanPc: Boolean,
+        cleanHeadset: Boolean,
+        photos: List<Bitmap>,
+    ): Result<Unit>
 
     suspend fun topUp(amountRub: Int): Result<Unit>
     suspend fun requestRefund(amountRub: Int, reason: String): Result<Unit>

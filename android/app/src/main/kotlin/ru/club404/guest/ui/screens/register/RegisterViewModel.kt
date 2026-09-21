@@ -76,7 +76,7 @@ class RegisterViewModel(private val repository: GuestRepository) : ViewModel() {
         val s = _state.value
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
-            val result = repository.register(s.phone, s.password, s.fio)
+            val result = repository.register(s.phone, s.password, s.fio, s.docPhoto, s.selfiePhoto)
             result.fold(
                 onSuccess = { _state.update { it.copy(loading = false, step = RegisterStep.PENDING) } },
                 // В отличие от сайта (который на любой ошибке всё равно показывает
