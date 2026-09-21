@@ -23,6 +23,7 @@ import adminGuestsRoutes from "./modules/adminGuests/routes.js";
 import appFacadeRoutes from "./modules/appFacade/routes.js";
 import pcAgentRoutes from "./modules/pcAgent/routes.js";
 import sessionReportsRoutes from "./modules/sessionReports/routes.js";
+import guestSelfServiceRoutes from "./modules/guestSelfService/routes.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -108,6 +109,11 @@ export async function buildApp() {
   // frontend/js/booking.js и Android GuestRepository. Авторизация: гостевой
   // JWT (authenticateGuest внутри routes.ts), кроме GET /stations.
   await app.register(appFacadeRoutes, { prefix: "/api" });
+
+  // Гостевые самообслуживание-ручки, которых не было в API вообще (quote,
+  // walk-in сессия, extend, топап, запрос возврата, каталог лояльности) —
+  // добавлены под Android-приложение, см. src/modules/guestSelfService.
+  await app.register(guestSelfServiceRoutes, { prefix: "/api" });
 
   // ПК-виджет станции (pc-widget.html) — авторизация по device-токену
   // станции (authenticateDevice), не по гостевому JWT: гость на станции

@@ -64,6 +64,7 @@ export class AppFacadeService {
         seat,
         label: device.name,
         tariffPerHour,
+        status: device.status,
       });
     }
     return stations;
