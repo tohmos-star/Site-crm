@@ -15,8 +15,34 @@ CI/CD собран через GitHub Actions, т.к. эта среда разр�
    - создаёт `.env` из `.env.example`, если его ещё нет, и подставляет туда
      секреты `JWT_SECRET`/`POSTGRES_PASSWORD`, переданные из CI;
    - собирает образ приложения (`docker compose build app`);
-   - поднимает `postgres`, прогоняет `prisma migrate deploy`, поднимает `app`;
+   - поднимает `postgres`, прогоняет `prisma migrate deploy`, затем
+     идемпотентный `prisma/seed.ts` (создаёт клуб/зоны/тарифы и дефолтного
+     админа при первом запуске, дальше — no-op), поднимает `app`;
    - ждёт `GET /health` и в случае ошибки печатает последние логи `app`.
+
+## Вход в CRM
+
+- Админка: `http://92.242.60.149:3000/admin/login.html`
+- Дефолтный логин (создаётся seed'ом при первом деплое,
+  см. `prisma/seed.ts`): `admin@404kh.local` / `change-me-404`.
+- В API/админке пока нет формы смены своего пароля. Сменить можно только
+  вручную на сервере — пароли хешируются scrypt'ом (`src/lib/password.ts`),
+  не bcrypt, так что просто UPDATE через SQL не подойдёт, хеш нужно
+  посчитать тем же алгоритмом:
+  ```bash
+  cd /opt/404-crm
+  NEW_HASH=$(docker compose run --rm seed node -e '
+    const {scryptSync, randomBytes} = require("crypto");
+    const salt = randomBytes(16);
+    const derived = scryptSync(process.argv[1], salt, 64);
+    console.log(salt.toString("hex") + ":" + derived.toString("hex"));
+  ' 'НОВЫЙ_ПАРОЛЬ')
+  docker compose exec -T postgres psql -U crm -d crm -c \
+    "UPDATE \"AdminUser\" SET \"passwordHash\"='$NEW_HASH' WHERE email='admin@404kh.local';"
+  ```
+  До появления формы смены пароля в админке проще также ограничить доступ
+  к `:3000` на уровне файрвола/VPN, а не полагаться только на смену пароля.
+- Гостевой сайт: `http://92.242.60.149:3000/index.html`
 
 ## Секреты репозитория
 

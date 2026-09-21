@@ -48,6 +48,9 @@ $SUDO docker compose up -d postgres
 echo "==> Прогоняю миграции Prisma"
 $SUDO docker compose run --rm app npx prisma migrate deploy
 
+echo "==> Прогоняю seed (идемпотентно — создаёт клуб/зоны/тарифы и дефолтного админа при первом запуске)"
+$SUDO docker compose --profile tools run --rm seed
+
 echo "==> Поднимаю app"
 $SUDO docker compose up -d app
 

@@ -30,5 +30,22 @@ services:
     ports:
       - "3000:3000"
 
+  # Одноразовый прогон seed'а (создаёт клуб/зоны/тарифы + дефолтного админа,
+  # идемпотентно — см. prisma/seed.ts). Собран из стадии build, а не
+  # runtime, — раннер-образ app не содержит src/ (seed.ts импортирует
+  # ../src/lib/password.js) и devDependencies (tsx). profiles: не поднимается
+  # обычным `docker compose up`, только явным `--profile tools run seed`.
+  seed:
+    build:
+      context: .
+      target: build
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD:-crm}@postgres:5432/crm?schema=public
+    command: ["npx", "tsx", "prisma/seed.ts"]
+
 volumes:
   postgres_data:
