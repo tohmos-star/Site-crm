@@ -29,6 +29,14 @@ const adminGuestsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   });
 
+  fastify.post("/admin/guests/:id/assign-door-code", {
+    schema: { params: GuestIdParams },
+    handler: async (request) => {
+      const { id } = request.params as { id: string };
+      return service.assignDoorCode(id);
+    },
+  });
+
   fastify.delete("/admin/guests/:id", {
     schema: { params: GuestIdParams },
     handler: async (request, reply) => {

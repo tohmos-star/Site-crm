@@ -66,6 +66,21 @@ export class AdminGuestsService {
     return this.toFacade(updated);
   }
 
+  // Для гостей, у которых нет кода (созданы до этой фичи, или пул кодов был
+  // пуст на момент их создания) — админ может назначить код вручную, не
+  // дожидаясь, пока гость сам откроет "Войти в клуб" (см. GET /entry-access,
+  // где это же происходит лениво на стороне гостя).
+  async assignDoorCode(id: string) {
+    const guest = await this.prisma.guest.findUnique({ where: { id } });
+    if (!guest) throw new NotFoundError("Guest", id);
+    const doorCode = await assignRandomDoorCode(this.prisma);
+    if (!doorCode) {
+      throw new DomainError("NO_DOOR_CODES", "В клубе ещё не задано ни одного кода двери (вкладка «Домофон и коды»)", 409);
+    }
+    const updated = await this.prisma.guest.update({ where: { id }, data: { doorCode } });
+    return this.toFacade(updated);
+  }
+
   async remove(id: string) {
     const guest = await this.prisma.guest.findUnique({ where: { id } });
     if (!guest) throw new NotFoundError("Guest", id);

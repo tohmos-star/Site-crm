@@ -222,7 +222,10 @@ async function loadGuests(search) {
         <td><input type="tel" value="${escapeHtml(g.phone)}" data-field="phone" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:5px 7px; width:130px; font-size:12px;"></td>
         <td><input type="text" value="${escapeHtml(g.fio || '')}" data-field="fio" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:5px 7px; width:160px; font-size:12px;"></td>
         <td><input type="number" value="${g.bonusPoints}" data-field="bonusPoints" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:5px 7px; width:70px; font-size:12px;"></td>
-        <td>${g.doorCode ? escapeHtml(g.doorCode) : '<span style="color:var(--text-muted);">—</span>'}</td>
+        <td>${g.doorCode
+          ? escapeHtml(g.doorCode)
+          : `<button class="btn btn-ghost" data-assign-door-code="${g.id}" style="padding:4px 8px; font-size:12px;">Назначить код</button>`
+        }</td>
         <td><span class="badge">${g.verification ? g.verification.status : 'нет анкеты'}</span></td>
         <td>
           <div class="row-actions">
@@ -243,6 +246,9 @@ async function loadGuests(search) {
     });
     tbody.querySelectorAll('[data-history-guest]').forEach(btn => {
       btn.addEventListener('click', () => toggleGuestHistory(btn.dataset.historyGuest));
+    });
+    tbody.querySelectorAll('[data-assign-door-code]').forEach(btn => {
+      btn.addEventListener('click', () => assignDoorCode(btn.dataset.assignDoorCode));
     });
   } catch (err) {
     if (err.message !== 'unauthorized' && err.message !== 'no token') {
@@ -323,6 +329,21 @@ async function saveGuest(id) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone, fio, bonusPoints }),
   });
+}
+
+async function assignDoorCode(id) {
+  try {
+    const res = await adminFetch(`/api/admin/guests/${id}/assign-door-code`, { method: 'POST' });
+    if (!res.ok) {
+      alert('Не удалось назначить код — возможно, в клубе ещё не задано ни одного кода двери (вкладка «Домофон и коды»).');
+      return;
+    }
+    loadGuests(document.getElementById('gSearch').value.trim());
+  } catch (err) {
+    if (err.message !== 'unauthorized' && err.message !== 'no token') {
+      alert('Не удалось назначить код.');
+    }
+  }
 }
 
 async function deleteGuest(id) {
