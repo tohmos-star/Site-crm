@@ -21,26 +21,44 @@ export class DeviceService {
     private readonly wol: WakeOnLanPort,
   ) {}
 
-  list(filter: { clubId?: string; zoneId?: string; status?: DeviceStatus }) {
-    return this.prisma.device.findMany({
+  // agentToken — секрет станции, предъявитель (см. authenticateDevice) —
+  // никогда не должен уходить в обычных списках/карточках устройства,
+  // только через отдельную ручку issueAgentToken (один раз, сразу после
+  // выпуска).
+  private stripToken<T extends { agentToken: string | null }>(device: T) {
+    const { agentToken, ...rest } = device;
+    return { ...rest, hasAgentToken: agentToken !== null };
+  }
+
+  async list(filter: { clubId?: string; zoneId?: string; status?: DeviceStatus }) {
+    const devices = await this.prisma.device.findMany({
       where: filter,
       orderBy: { cardNumber: "asc" },
     });
+    return devices.map((d) => this.stripToken(d));
   }
 
   async get(id: string) {
     const device = await this.prisma.device.findUnique({ where: { id } });
     if (!device) throw new NotFoundError("Device", id);
-    return device;
+    return this.stripToken(device);
   }
 
-  create(body: DeviceBody) {
-    return this.prisma.device.create({ data: body });
+  async create(body: DeviceBody) {
+    const device = await this.prisma.device.create({ data: body });
+    return this.stripToken(device);
   }
 
   async update(id: string, body: Partial<DeviceBody>) {
-    await this.get(id);
-    return this.prisma.device.update({ where: { id }, data: body });
+    await this.getRaw(id);
+    const device = await this.prisma.device.update({ where: { id }, data: body });
+    return this.stripToken(device);
+  }
+
+  private async getRaw(id: string) {
+    const device = await this.prisma.device.findUnique({ where: { id } });
+    if (!device) throw new NotFoundError("Device", id);
+    return device;
   }
 
   async delete(id: string) {
@@ -61,7 +79,8 @@ export class DeviceService {
       );
     }
 
-    return this.prisma.device.update({ where: { id }, data: { status } });
+    const updated = await this.prisma.device.update({ where: { id }, data: { status } });
+    return this.stripToken(updated);
   }
 
   async bulkSetStatus(deviceIds: string[], status: DeviceStatus) {

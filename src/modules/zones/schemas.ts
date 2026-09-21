@@ -7,6 +7,7 @@ export const ZoneBody = Type.Object({
   color: Type.Optional(Type.String()),
   sortOrder: Type.Optional(Type.Integer()),
   isRoom: Type.Optional(Type.Boolean()),
+  defaultTariffId: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 });
 export type ZoneBody = Static<typeof ZoneBody>;
 

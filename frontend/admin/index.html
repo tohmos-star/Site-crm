@@ -42,6 +42,10 @@
       <button class="tab-btn active" data-tab="verification">Верификация анкет</button>
       <button class="tab-btn" data-tab="access">Домофон и коды</button>
       <button class="tab-btn" data-tab="guests">Гости</button>
+      <button class="tab-btn" data-tab="devices">Устройства</button>
+      <button class="tab-btn" data-tab="zones">Зоны</button>
+      <button class="tab-btn" data-tab="tariffs">Тарифы</button>
+      <button class="tab-btn" data-tab="loyalty">Лояльность</button>
       <button class="tab-btn" data-tab="analytics">Статистика</button>
     </div>
 
@@ -94,6 +98,173 @@
           <tbody id="gTableBody"><tr><td colspan="5" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
         </table>
       </div>
+    </section>
+
+    <!-- ---- Устройства ---- -->
+    <section class="tab-panel" id="tab-devices">
+      <div class="filter-row">
+        <select id="dZoneFilter"><option value="">Все зоны</option></select>
+        <select id="dStatusFilter">
+          <option value="">Все статусы</option>
+          <option value="FREE">Свободно</option>
+          <option value="BUSY">Занято</option>
+          <option value="CONNECTING">Подключение</option>
+          <option value="TECH_MODE">Тех.режим</option>
+          <option value="LOCKED">Заблокировано</option>
+          <option value="DISABLED">Отключено</option>
+        </select>
+        <button class="btn btn-ghost" id="dRefresh" style="padding:8px 14px; font-size:13px;">Обновить</button>
+        <button class="btn btn-primary" id="dAddBtn" style="padding:8px 14px; font-size:13px;">+ Добавить устройство</button>
+      </div>
+      <div id="dAddForm" class="form-panel" style="max-width:480px; margin-bottom:16px; display:none;">
+        <div class="field"><label>Зона</label><select id="dNewZone"></select></div>
+        <div class="field"><label>Название</label><input type="text" id="dNewName" placeholder="DUO 1 · место 1"></div>
+        <div class="field"><label>№ карточки</label><input type="number" id="dNewCard" placeholder="1"></div>
+        <div class="field"><label>Тип</label>
+          <select id="dNewKind">
+            <option value="PC">PC</option>
+            <option value="TV">TV</option>
+            <option value="TERMINAL">Терминал</option>
+            <option value="ADMIN_PC">Админский ПК</option>
+          </select>
+        </div>
+        <div class="field"><label>MAC-адрес (для Wake-on-LAN, необязательно)</label><input type="text" id="dNewMac" placeholder="AA:BB:CC:DD:EE:FF"></div>
+        <button class="btn btn-primary" id="dAddSubmit" style="width:100%; justify-content:center;">Создать</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="admin-table">
+          <thead><tr><th>Зона</th><th>Название</th><th>№</th><th>Статус</th><th>Токен станции</th><th>Действия</th></tr></thead>
+          <tbody id="dTableBody"><tr><td colspan="6" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ---- Зоны ---- -->
+    <section class="tab-panel" id="tab-zones">
+      <div class="filter-row">
+        <button class="btn btn-primary" id="zAddBtn" style="padding:8px 14px; font-size:13px;">+ Добавить зону</button>
+      </div>
+      <div id="zAddForm" class="form-panel" style="max-width:420px; margin-bottom:16px; display:none;">
+        <div class="field"><label>Название</label><input type="text" id="zNewName" placeholder="DUO 3"></div>
+        <div class="field" style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="zNewIsRoom" style="width:auto;"><label for="zNewIsRoom" style="margin:0;">Комната (общий тариф на несколько мест)</label></div>
+        <button class="btn btn-primary" id="zAddSubmit" style="width:100%; justify-content:center;">Создать</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="admin-table">
+          <thead><tr><th>Название</th><th>Комната</th><th>Тариф для быстрой брони</th><th>Действия</th></tr></thead>
+          <tbody id="zTableBody"><tr><td colspan="4" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ---- Тарифы ---- -->
+    <section class="tab-panel" id="tab-tariffs">
+      <h3 style="font-size:14px; margin:0 0 10px;">Типы дней</h3>
+      <div class="filter-row" style="align-items:flex-end;">
+        <div class="field" style="margin:0;"><label>Название</label><input type="text" id="dtNewName" placeholder="Будни" style="width:140px;"></div>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label style="font-size:12px; color:var(--text-muted);">Дни недели</label>
+          <div style="display:flex; gap:6px;">
+            <label><input type="checkbox" class="dt-weekday" value="1" style="width:auto;"> Пн</label>
+            <label><input type="checkbox" class="dt-weekday" value="2" style="width:auto;"> Вт</label>
+            <label><input type="checkbox" class="dt-weekday" value="3" style="width:auto;"> Ср</label>
+            <label><input type="checkbox" class="dt-weekday" value="4" style="width:auto;"> Чт</label>
+            <label><input type="checkbox" class="dt-weekday" value="5" style="width:auto;"> Пт</label>
+            <label><input type="checkbox" class="dt-weekday" value="6" style="width:auto;"> Сб</label>
+            <label><input type="checkbox" class="dt-weekday" value="0" style="width:auto;"> Вс</label>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="dtAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить</button>
+      </div>
+      <table class="admin-table" style="margin-bottom:24px;">
+        <thead><tr><th>Название</th><th>Дни</th></tr></thead>
+        <tbody id="dtTableBody"><tr><td colspan="2" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
+      </table>
+
+      <h3 style="font-size:14px; margin:0 0 10px;">Группы тарифов</h3>
+      <div class="filter-row">
+        <input type="text" id="tgNewName" placeholder="Основные" style="width:200px;">
+        <button class="btn btn-primary" id="tgAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить</button>
+      </div>
+      <table class="admin-table" style="margin-bottom:24px;">
+        <thead><tr><th>Название</th></tr></thead>
+        <tbody id="tgTableBody"><tr><td colspan="1" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
+      </table>
+
+      <h3 style="font-size:14px; margin:0 0 10px;">Тарифы</h3>
+      <div class="filter-row" style="align-items:flex-end;">
+        <div class="field" style="margin:0;"><label>Группа</label><select id="tNewGroup" style="width:160px;"></select></div>
+        <div class="field" style="margin:0;"><label>Тип</label>
+          <select id="tNewType" style="width:140px;">
+            <option value="BASE">Базовый</option>
+            <option value="PACKAGE">Пакет</option>
+            <option value="SUBSCRIPTION">Абонемент</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0;"><label>Название</label><input type="text" id="tNewName" placeholder="Почасовой" style="width:180px;"></div>
+        <div class="field" style="margin:0;" id="tNewPackageMinWrap"><label>Длительность пакета, мин</label><input type="number" id="tNewPackageMin" placeholder="180" style="width:120px;"></div>
+        <button class="btn btn-primary" id="tAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить</button>
+      </div>
+      <table class="admin-table" style="margin-bottom:16px;">
+        <thead><tr><th>Группа</th><th>Тип</th><th>Название</th><th>Действия</th></tr></thead>
+        <tbody id="tTableBody"><tr><td colspan="4" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
+      </table>
+
+      <div id="trPanel" style="display:none;">
+        <h3 style="font-size:14px; margin:0 0 10px;">Правила цен — <span id="trTariffName"></span></h3>
+        <div class="filter-row" style="align-items:flex-end;">
+          <div class="field" style="margin:0;"><label>Зона</label><select id="trNewZone" style="width:140px;"></select></div>
+          <div class="field" style="margin:0;"><label>Тип дня</label><select id="trNewDayType" style="width:120px;"></select></div>
+          <div class="field" style="margin:0;"><label>С</label><input type="time" id="trNewStart" value="00:00" style="width:100px;"></div>
+          <div class="field" style="margin:0;"><label>По</label><input type="time" id="trNewEnd" value="23:59" style="width:100px;"></div>
+          <div class="field" style="margin:0;"><label>Цена/мин, ₽</label><input type="number" step="0.01" id="trNewPrice" placeholder="4.17" style="width:100px;"></div>
+          <button class="btn btn-primary" id="trAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить правило</button>
+        </div>
+        <table class="admin-table">
+          <thead><tr><th>Зона</th><th>Тип дня</th><th>С</th><th>По</th><th>Цена/мин</th><th>≈ Цена/час</th><th>Действия</th></tr></thead>
+          <tbody id="trTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ---- Лояльность ---- -->
+    <section class="tab-panel" id="tab-loyalty">
+      <h3 style="font-size:14px; margin:0 0 10px;">Группы гостей (по накопленным часам)</h3>
+      <div class="filter-row" style="align-items:flex-end;">
+        <div class="field" style="margin:0;"><label>Название</label><input type="text" id="ltNewName" placeholder="Серебро" style="width:140px;"></div>
+        <div class="field" style="margin:0;"><label>Часов от</label><input type="number" id="ltNewMinHours" value="0" style="width:90px;"></div>
+        <div class="field" style="margin:0;"><label>Часов до</label><input type="number" id="ltNewMaxHours" placeholder="∞" style="width:90px;"></div>
+        <div class="field" style="margin:0;"><label>% скидки</label><input type="number" id="ltNewDiscount" value="0" style="width:90px;"></div>
+        <div class="field" style="margin:0;"><label>% кэшбэка</label><input type="number" id="ltNewCashback" value="0" style="width:90px;"></div>
+        <button class="btn btn-primary" id="ltAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить</button>
+      </div>
+      <table class="admin-table" style="margin-bottom:24px;">
+        <thead><tr><th>Название</th><th>Часов от</th><th>Часов до</th><th>% скидки</th><th>% кэшбэка</th></tr></thead>
+        <tbody id="ltTableBody"><tr><td colspan="5" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
+      </table>
+
+      <h3 style="font-size:14px; margin:0 0 10px;">Ручные группы гостей</h3>
+      <div class="filter-row">
+        <input type="text" id="mgNewName" placeholder="Уважаемые люди" style="width:200px;">
+        <input type="number" id="mgNewDiscount" placeholder="% скидки" style="width:100px;">
+        <button class="btn btn-primary" id="mgAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить</button>
+      </div>
+      <table class="admin-table" style="margin-bottom:24px;">
+        <thead><tr><th>Название</th><th>% скидки</th></tr></thead>
+        <tbody id="mgTableBody"><tr><td colspan="2" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
+      </table>
+
+      <h3 style="font-size:14px; margin:0 0 10px;">Автобонусы</h3>
+      <div class="filter-row">
+        <select id="abNewTrigger"><option value="REGISTRATION">При регистрации</option><option value="TOPUP">При пополнении</option></select>
+        <select id="abNewRewardType"><option value="PERCENT">% от суммы</option><option value="FIXED">Фикс. сумма</option></select>
+        <input type="number" id="abNewRewardValue" placeholder="Значение" style="width:100px;">
+        <button class="btn btn-primary" id="abAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить</button>
+      </div>
+      <table class="admin-table">
+        <thead><tr><th>Событие</th><th>Награда</th></tr></thead>
+        <tbody id="abTableBody"><tr><td colspan="2" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
+      </table>
     </section>
 
     <!-- ---- 4. Статистика ---- -->
