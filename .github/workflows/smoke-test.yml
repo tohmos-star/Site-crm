@@ -51,3 +51,37 @@ jobs:
 
           echo "== GET /api/tariffs =="
           curl -fsS "$BASE/api/tariffs" -H "Authorization: Bearer $TOKEN" | jq '.'
+
+          echo "== GET /api/stations (expect status field) =="
+          curl -fsS "$BASE/api/stations" | jq '.stations[0]'
+
+          # Новые гостевые ручки (guestSelfService) — полного гостевого
+          # аккаунта тут нет (регистрация требует фото + одобрение админом),
+          # поэтому просто подтверждаем, что роуты зарегистрированы и
+          # защищены гостевым JWT: без токена должно быть 401, а не 404.
+          # Body должен пройти schema-валидацию (она у Fastify выполняется
+          # ДО preHandler/auth) — иначе получим 400 вместо 401 и ничего не
+          # докажем про сам роут.
+          check_guest_route_exists() {
+            local method="$1" path="$2" body="${3:-}"
+            local code
+            if [ -n "$body" ]; then
+              code=$(curl -s -o /dev/null -w '%{http_code}' -X "$method" "$BASE$path" -H 'Content-Type: application/json' -d "$body")
+            else
+              code=$(curl -s -o /dev/null -w '%{http_code}' -X "$method" "$BASE$path")
+            fi
+            echo "$method $path -> $code"
+            if [ "$code" != "401" ]; then
+              echo "Expected 401 (route exists, guest auth required), got $code" >&2
+              exit 1
+            fi
+          }
+
+          echo "== Guest self-service routes (expect 401 without guest token) =="
+          check_guest_route_exists POST /api/bookings/quote '{"stationId":"x","minutes":30}'
+          check_guest_route_exists POST /api/sessions '{"stationId":"x","minutes":30}'
+          check_guest_route_exists GET /api/sessions/active
+          check_guest_route_exists POST /api/topup '{"amount":100}'
+          check_guest_route_exists GET /api/refund-requests
+          check_guest_route_exists GET /api/loyalty-tiers
+          echo "OK: all guest self-service routes are registered and guarded"
