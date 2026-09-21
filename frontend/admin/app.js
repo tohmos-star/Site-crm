@@ -171,31 +171,42 @@ async function loadAccessCredential() {
   } catch { /* handled by adminFetch redirect */ }
 }
 
+// Бэкенду (PUT /api/admin/access-credential) нужны оба поля разом, так что
+// обе кнопки шлют один и тот же полный запрос с текущими значениями формы —
+// разница только в том, какую кнопку нажал админ и куда пишется статус.
+async function saveAccessCredential(statusElId) {
+  const statusEl = document.getElementById(statusElId);
+  try {
+    const res = await adminFetch('/api/admin/access-credential', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        intercomUrl: document.getElementById('accIntercom').value.trim(),
+        doorCodeMain: collectDoorCodes(),
+      }),
+    });
+    if (!res.ok) throw new Error();
+    statusEl.textContent = 'Сохранено.';
+    statusEl.className = 'status-msg show ok';
+  } catch {
+    statusEl.textContent = 'Не удалось сохранить.';
+    statusEl.className = 'status-msg show err';
+  }
+}
+
 function initAccessForm() {
   document.getElementById('accAddCode').addEventListener('click', () => {
     addDoorCodeRow('');
     updateAccAddCodeVisibility();
   });
 
-  document.getElementById('accessForm').addEventListener('submit', async (e) => {
+  document.getElementById('accIntercomSave').addEventListener('click', () => {
+    saveAccessCredential('accIntercomStatus');
+  });
+
+  document.getElementById('accessForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    const statusEl = document.getElementById('accessStatus');
-    try {
-      const res = await adminFetch('/api/admin/access-credential', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          intercomUrl: document.getElementById('accIntercom').value.trim(),
-          doorCodeMain: collectDoorCodes(),
-        }),
-      });
-      if (!res.ok) throw new Error();
-      statusEl.textContent = 'Сохранено.';
-      statusEl.className = 'status-msg show ok';
-    } catch {
-      statusEl.textContent = 'Не удалось сохранить.';
-      statusEl.className = 'status-msg show err';
-    }
+    saveAccessCredential('accessStatus');
   });
 }
 

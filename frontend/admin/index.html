@@ -71,13 +71,18 @@
     <section class="tab-panel" id="tab-access">
       <div class="form-panel" style="max-width:480px;">
         <form id="accessForm">
-          <div class="field"><label>Ссылка на домофон</label><input type="text" id="accIntercom" placeholder="https://domovoy.city/skud/link/?token=..."></div>
+          <div class="field">
+            <label>Ссылка на домофон</label>
+            <input type="text" id="accIntercom" placeholder="https://domovoy.city/skud/link/?token=...">
+            <button type="button" class="btn btn-primary" id="accIntercomSave" style="margin-top:8px; padding:6px 14px; font-size:13px;">Сохранить ссылку</button>
+            <div class="status-msg" id="accIntercomStatus"></div>
+          </div>
           <div class="field">
             <label>Коды двери (до 10 одновременно действующих)</label>
             <div id="accDoorCodes"></div>
             <button type="button" class="btn btn-ghost" id="accAddCode" style="margin-top:8px; padding:6px 12px; font-size:13px;">+ Добавить код</button>
           </div>
-          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Сохранить</button>
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Сохранить коды</button>
           <div class="status-msg" id="accessStatus"></div>
         </form>
       </div>
