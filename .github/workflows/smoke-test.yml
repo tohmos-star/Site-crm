@@ -1,0 +1,53 @@
+name: Smoke test deployed CRM
+
+# Проверяет боевой сервер снаружи (сама песочница разработки не имеет
+# сетевого доступа к нему, только раннеры Actions) — health, публичный
+# /api/status, админ-логин и что seed реально создал зоны/устройства/тарифы.
+on:
+  push:
+    branches:
+      - claude/crm-server-deployment-bmkzrr
+    paths:
+      - ".github/workflows/smoke-test.yml"
+  workflow_dispatch: {}
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health + status + admin login + seeded data
+        env:
+          BASE: "http://92.242.60.149:3000"
+          ADMIN_EMAIL: "admin@404kh.local"
+          ADMIN_PASSWORD: "change-me-404"
+        run: |
+          set -euo pipefail
+
+          echo "== GET /health =="
+          curl -fsS "$BASE/health"; echo
+
+          echo "== GET /api/status =="
+          curl -fsS "$BASE/api/status"; echo
+
+          echo "== GET /admin/login.html (frontend) =="
+          curl -fsSI "$BASE/admin/login.html" | head -1
+
+          echo "== POST /api/admin/login =="
+          RESP=$(curl -fsS -X POST "$BASE/api/admin/login" \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}")
+          TOKEN=$(echo "$RESP" | jq -r '.token // empty')
+          if [ -z "$TOKEN" ]; then
+            echo "Admin login failed, response: $RESP" >&2
+            exit 1
+          fi
+          echo "OK: got admin token"
+
+          echo "== GET /api/zones =="
+          curl -fsS "$BASE/api/zones" -H "Authorization: Bearer $TOKEN" | jq '. as $z | {count: ($z | length), names: [.[].nameRu]}'
+
+          echo "== GET /api/devices =="
+          curl -fsS "$BASE/api/devices" -H "Authorization: Bearer $TOKEN" | jq '. as $d | {count: ($d | length)}'
+
+          echo "== GET /api/tariffs =="
+          curl -fsS "$BASE/api/tariffs" -H "Authorization: Bearer $TOKEN" | jq '.'
