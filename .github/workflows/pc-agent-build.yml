@@ -36,9 +36,12 @@ jobs:
       - name: Publish
         run: dotnet publish --configuration Release --runtime win-x64 --self-contained false -p:PublishSingleFile=true --output publish
 
+      - name: Bundle uninstall script
+        run: Copy-Item uninstall.ps1 publish/uninstall.ps1
+
       - name: Upload exe artifact
         uses: actions/upload-artifact@v4
         with:
           name: pc-agent-exe
-          path: pc-agent/publish/PcAgent.exe
+          path: pc-agent/publish
           if-no-files-found: error

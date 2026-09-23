@@ -7,7 +7,8 @@
         ResizeMode="NoResize"
         Topmost="True"
         ShowInTaskbar="False"
-        Background="#10141B">
+        Background="#10141B"
+        KeyDown="Window_KeyDown">
     <Grid>
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="520">
             <TextBlock Text="404" Foreground="#3ED598" FontSize="28" FontWeight="Bold"

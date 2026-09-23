@@ -121,12 +121,22 @@ public partial class MainWindow : Window
         if (_lockScreen is not null) return;
         _lockScreen = new LockScreenWindow();
         _lockScreen.Closed += (_, _) => _lockScreen = null;
+        _lockScreen.EmergencyUnlockRequested += (_, _) => HandleEmergencyUnlock();
         _lockScreen.Show();
     }
 
     private void HideLockScreen()
     {
         _lockScreen?.ForceClose();
+    }
+
+    // Ctrl+Alt+Shift+U на экране блокировки — аварийный выход для персонала
+    // клуба, если сервер недоступен или оверлей завис. Снимает блокировку
+    // без переустановки/удаления агента.
+    private void HandleEmergencyUnlock()
+    {
+        LockStateStore.ClearLocked();
+        ShowNoSessionState(null);
     }
 
     private void RenderSession()
