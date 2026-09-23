@@ -1,0 +1,35 @@
+<Window x:Class="PcAgent.SupportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Тех.поддержка" Height="400" Width="340"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#10141B">
+    <StackPanel Margin="24">
+        <TextBlock Text="Тех.поддержка" Foreground="#E7ECF3" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center"/>
+        <TextBlock Text="90% проблем решаются перезагрузкой ПК" Foreground="#8592A3" FontSize="11.5"
+                   HorizontalAlignment="Center" Margin="0,2,0,16" TextWrapping="Wrap" TextAlignment="Center"/>
+
+        <StackPanel x:Name="FormPanel">
+            <TextBlock Text="Тема" Foreground="#8592A3" FontSize="12" Margin="0,0,0,6"/>
+            <RadioButton x:Name="Reason1" Content="Не открывается дверь" GroupName="Reason"
+                         Foreground="#E7ECF3" Margin="0,0,0,6" Checked="Reason_Checked"/>
+            <RadioButton x:Name="Reason2" Content="Проблема с ПК" GroupName="Reason"
+                         Foreground="#E7ECF3" Margin="0,0,0,6" Checked="Reason_Checked"/>
+            <RadioButton x:Name="Reason3" Content="Оплата и баланс" GroupName="Reason"
+                         Foreground="#E7ECF3" Margin="0,0,0,10" Checked="Reason_Checked"/>
+
+            <TextBlock Text="Сообщение (необязательно)" Foreground="#8592A3" FontSize="12" Margin="0,0,0,6"/>
+            <TextBox x:Name="MessageInput" Background="#212B38" Foreground="#E7ECF3" BorderBrush="#2A3441"
+                     AcceptsReturn="True" TextWrapping="Wrap" Height="60" Padding="8"/>
+
+            <Button x:Name="SendButton" Content="Отправить" Margin="0,14,0,0" Padding="0,11"
+                    Background="#212B38" Foreground="#8592A3" BorderThickness="0" IsEnabled="False"
+                    Click="SendButton_Click"/>
+        </StackPanel>
+
+        <TextBlock x:Name="SentText" Text="✓ Заявка отправлена, администратор уведомлён"
+                   Foreground="#3ED598" FontSize="13" HorizontalAlignment="Center"
+                   Margin="0,20,0,0" Visibility="Collapsed" TextWrapping="Wrap" TextAlignment="Center"/>
+    </StackPanel>
+</Window>
