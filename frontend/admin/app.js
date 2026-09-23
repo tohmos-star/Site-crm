@@ -520,8 +520,12 @@ async function loadDevices() {
           <td>${escapeHtml(d.name)}</td>
           <td>${d.cardNumber}</td>
           <td>
-            ${d.hasAgentToken
-              ? `<span class="badge" style="color:var(--ok, #4ADE9C);">выдан</span> <button class="btn btn-ghost" data-revoke-token="${d.id}" style="font-size:11px; padding:4px 8px;">Отозвать</button>`
+            ${d.agentToken
+              ? `<code style="font-size:11px; word-break:break-all; user-select:all;">${escapeHtml(d.agentToken)}</code>
+                 <div class="row-actions" style="margin-top:4px;">
+                   <button class="btn btn-ghost" data-copy-token="${escapeHtml(d.agentToken)}" style="font-size:11px; padding:4px 8px;">Копировать</button>
+                   <button class="btn btn-ghost" data-revoke-token="${d.id}" style="font-size:11px; padding:4px 8px;">Отозвать</button>
+                 </div>`
               : `<button class="btn btn-primary" data-issue-token="${d.id}" style="font-size:11px; padding:4px 8px;">Выдать токен</button>`}
           </td>
           <td>
@@ -530,7 +534,6 @@ async function loadDevices() {
             </div>
           </td>
         </tr>
-        <tr class="d-token-row" data-token-row="${d.id}" style="display:none;"><td colspan="5"></td></tr>
       `;
     }).join('');
 
@@ -550,17 +553,20 @@ async function loadDevices() {
     });
     tbody.querySelectorAll('[data-issue-token]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const id = btn.dataset.issueToken;
-        const res = await adminFetch(`/api/devices/${id}/agent-token`, { method: 'POST' });
-        const data = await res.json();
-        const tokenRow = tbody.querySelector(`[data-token-row="${id}"]`);
-        tokenRow.style.display = '';
-        tokenRow.querySelector('td').innerHTML = `
-          <div style="background:var(--panel); border:1px solid var(--accent); border-radius:8px; padding:10px 12px; font-size:12px;">
-            Токен станции (показывается один раз, вставьте его в настройку pc-widget.html): <br>
-            <code style="user-select:all; word-break:break-all;">${escapeHtml(data.agentToken)}</code>
-          </div>`;
+        await adminFetch(`/api/devices/${btn.dataset.issueToken}/agent-token`, { method: 'POST' });
         loadDevices();
+      });
+    });
+    tbody.querySelectorAll('[data-copy-token]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(btn.dataset.copyToken);
+          const original = btn.textContent;
+          btn.textContent = 'Скопировано!';
+          setTimeout(() => { btn.textContent = original; }, 1500);
+        } catch {
+          alert('Не удалось скопировать — выделите токен вручную.');
+        }
       });
     });
     tbody.querySelectorAll('[data-revoke-token]').forEach(btn => {

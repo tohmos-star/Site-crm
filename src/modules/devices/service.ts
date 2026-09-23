@@ -21,33 +21,22 @@ export class DeviceService {
     private readonly wol: WakeOnLanPort,
   ) {}
 
-  // agentToken — секрет станции, предъявитель (см. authenticateDevice) —
-  // никогда не должен уходить в обычных списках/карточках устройства,
-  // только через отдельную ручку issueAgentToken (один раз, сразу после
-  // выпуска).
-  private stripToken<T extends { agentToken: string | null }>(device: T) {
-    const { agentToken, ...rest } = device;
-    return { ...rest, hasAgentToken: agentToken !== null };
-  }
-
   async list(filter: { clubId?: string; zoneId?: string; status?: DeviceStatus }) {
-    const devices = await this.prisma.device.findMany({
+    return this.prisma.device.findMany({
       where: filter,
       orderBy: { cardNumber: "asc" },
     });
-    return devices.map((d) => this.stripToken(d));
   }
 
   async get(id: string) {
     const device = await this.prisma.device.findUnique({ where: { id } });
     if (!device) throw new NotFoundError("Device", id);
-    return this.stripToken(device);
+    return device;
   }
 
   async create(body: DeviceBody) {
     const cardNumber = body.cardNumber ?? (await this.nextCardNumber(body.clubId));
-    const device = await this.prisma.device.create({ data: { ...body, cardNumber } });
-    return this.stripToken(device);
+    return this.prisma.device.create({ data: { ...body, cardNumber } });
   }
 
   // Номер карточки больше не вводится вручную в форме — берём следующий
@@ -61,15 +50,8 @@ export class DeviceService {
   }
 
   async update(id: string, body: Partial<DeviceBody>) {
-    await this.getRaw(id);
-    const device = await this.prisma.device.update({ where: { id }, data: body });
-    return this.stripToken(device);
-  }
-
-  private async getRaw(id: string) {
-    const device = await this.prisma.device.findUnique({ where: { id } });
-    if (!device) throw new NotFoundError("Device", id);
-    return device;
+    await this.get(id);
+    return this.prisma.device.update({ where: { id }, data: body });
   }
 
   async delete(id: string) {
@@ -90,8 +72,7 @@ export class DeviceService {
       );
     }
 
-    const updated = await this.prisma.device.update({ where: { id }, data: { status } });
-    return this.stripToken(updated);
+    return this.prisma.device.update({ where: { id }, data: { status } });
   }
 
   async bulkSetStatus(deviceIds: string[], status: DeviceStatus) {
@@ -114,9 +95,10 @@ export class DeviceService {
     await this.wol.wake(device.mac);
   }
 
-  // Разовая выдача токена ПК-станции при настройке (см. authenticateDevice
-  // в src/plugins/auth.ts) — показывается админу один раз, дальше только
-  // перевыпуск (старый токен инвалидируется).
+  // Выдача токена ПК-станции при настройке (см. authenticateDevice в
+  // src/plugins/auth.ts) — виден админу постоянно в списке устройств
+  // (agentToken больше не вырезается из ответов), перевыпуск инвалидирует
+  // старый.
   async issueAgentToken(id: string) {
     await this.get(id);
     const token = randomBytes(24).toString("base64url");
