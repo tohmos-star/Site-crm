@@ -1,0 +1,14 @@
+<Window x:Class="PcAgent.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="404 · PC Agent" Height="200" Width="360"
+        WindowStartupLocation="CenterScreen">
+    <Grid Background="#0B0C0E">
+        <TextBlock Text="PC Agent — в разработке"
+                   Foreground="#F2F1ED"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   FontFamily="Segoe UI"
+                   FontSize="16"/>
+    </Grid>
+</Window>

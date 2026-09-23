@@ -1,0 +1,44 @@
+name: Build PC Agent (Windows)
+
+# Собирает pc-agent/ (нативный WPF-виджет для игровых ПК клуба — блокирует
+# станцию по окончании оплаченного времени, привязывается токеном станции
+# из "Устройства" в админке) на windows-latest, т.к. песочница разработки
+# — Linux и не может собрать/проверить WPF (Windows-only UI framework).
+on:
+  push:
+    branches:
+      - claude/crm-server-deployment-bmkzrr
+    paths:
+      - 'pc-agent/**'
+      - '.github/workflows/pc-agent-build.yml'
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: pc-agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Publish
+        run: dotnet publish --configuration Release --runtime win-x64 --self-contained false -p:PublishSingleFile=true --output publish
+
+      - name: Upload exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pc-agent-exe
+          path: pc-agent/publish/PcAgent.exe
+          if-no-files-found: error
