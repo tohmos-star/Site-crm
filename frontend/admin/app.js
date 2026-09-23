@@ -35,6 +35,13 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// Токен станции хранится без разделителя (8 симв.), дефис только для
+// удобства чтения/диктовки — виджет на ПК сам убирает нецифро-буквенные
+// символы при вводе, так что формат при копировании не важен.
+function formatStationToken(token) {
+  return token.length === 8 ? `${token.slice(0, 4)}-${token.slice(4)}` : token;
+}
+
 // ---------------------------------------------------------------------
 // Разделы (боковое меню вместо ряда вкладок)
 // ---------------------------------------------------------------------
@@ -521,7 +528,7 @@ async function loadDevices() {
           <td>${d.cardNumber}</td>
           <td>
             ${d.agentToken
-              ? `<code style="font-size:11px; word-break:break-all; user-select:all;">${escapeHtml(d.agentToken)}</code>
+              ? `<code style="font-size:13px; letter-spacing:0.05em; user-select:all;">${escapeHtml(formatStationToken(d.agentToken))}</code>
                  <div class="row-actions" style="margin-top:4px;">
                    <button class="btn btn-ghost" data-copy-token="${escapeHtml(d.agentToken)}" style="font-size:11px; padding:4px 8px;">Копировать</button>
                    <button class="btn btn-ghost" data-revoke-token="${d.id}" style="font-size:11px; padding:4px 8px;">Отозвать</button>

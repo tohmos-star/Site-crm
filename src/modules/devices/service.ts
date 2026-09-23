@@ -1,8 +1,17 @@
-import { randomBytes } from "node:crypto";
-import type { DeviceStatus, PrismaClient } from "@prisma/client";
+import { randomInt } from "node:crypto";
+import { Prisma, type DeviceStatus, type PrismaClient } from "@prisma/client";
 import { DomainError, NotFoundError } from "../../lib/errors.js";
 import type { WakeOnLanPort } from "./wol.js";
 import type { DeviceBody } from "./schemas.js";
+
+// Токен станции вводит вручную владелец/сисадмин клуба при установке
+// виджета на ПК — значит он должен быть коротким и без символов, которые
+// легко перепутать на глаз (0/O, 1/I/L исключены). 8 символов из 31-буквенного
+// алфавита — это ~8.5×10^11 комбинаций, вводится за несколько секунд и
+// достаточно устойчив к подбору (плюс токен можно перевыпустить в любой
+// момент, если он скомпрометирован).
+const STATION_TOKEN_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+const STATION_TOKEN_LENGTH = 8;
 
 // Разрешённые переходы статуса ПК (панель управления устройствами LANGAME
 // как референс для набора статусов; логика решений — здесь, HA — исполнитель).
@@ -101,9 +110,31 @@ export class DeviceService {
   // старый.
   async issueAgentToken(id: string) {
     await this.get(id);
-    const token = randomBytes(24).toString("base64url");
-    await this.prisma.device.update({ where: { id }, data: { agentToken: token } });
-    return { agentToken: token };
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const token = this.generateStationToken();
+      try {
+        await this.prisma.device.update({ where: { id }, data: { agentToken: token } });
+        return { agentToken: token };
+      } catch (err) {
+        // P2002 — редчайшее совпадение с уже выданным токеном другой
+        // станции (agentToken @unique глобально) — просто пробуем ещё раз.
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") continue;
+        throw err;
+      }
+    }
+    throw new DomainError(
+      "TOKEN_GENERATION_FAILED",
+      "Не удалось сгенерировать уникальный токен станции, попробуйте ещё раз",
+      500,
+    );
+  }
+
+  private generateStationToken(): string {
+    let token = "";
+    for (let i = 0; i < STATION_TOKEN_LENGTH; i++) {
+      token += STATION_TOKEN_ALPHABET[randomInt(STATION_TOKEN_ALPHABET.length)];
+    }
+    return token;
   }
 
   async revokeAgentToken(id: string) {

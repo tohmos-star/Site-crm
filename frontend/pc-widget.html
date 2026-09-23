@@ -122,7 +122,9 @@
   }
 
   async function saveDeviceToken() {
-    const token = setupInput.trim();
+    // Токен диктуют/вводят вручную — не важно, ввёл ли человек его с
+    // дефисом, строчными буквами или пробелом, нормализуем перед отправкой.
+    const token = setupInput.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!token) return;
     setupSaving = true; setupError = null; render();
     deviceToken = token;
@@ -321,7 +323,7 @@
         <div style="width:min(92%,340px);background:rgba(16,20,27,0.94);border:1px solid ${BORDER};border-radius:14px;padding:22px;text-align:center;">
           <div style="font-size:13px;font-weight:600;color:${TEXT};margin-bottom:4px;">404 · настройка станции</div>
           <div style="font-size:12px;color:${TEXT_MUTED};margin-bottom:18px;">Вставьте токен устройства, выданный админом в разделе «Устройства»</div>
-          <input id="pcwSetupInput" value="${setupInput}" placeholder="agentToken" autocomplete="off"
+          <input id="pcwSetupInput" value="${setupInput}" placeholder="K7M2-P9QX" autocomplete="off" maxlength="9"
             style="width:100%;text-align:center;background:${SURFACE_ALT};border:1px solid ${BORDER};border-radius:10px;color:${TEXT};font-family:${MONO};font-size:13px;padding:12px 10px;box-sizing:border-box;">
           ${setupError ? `<div style="color:${RED};font-size:12px;margin-top:10px;">${setupError}</div>` : ''}
           <button data-action="saveSetup" ${(setupInput.trim() && !setupSaving) ? '' : 'disabled'} style="width:100%;margin-top:14px;${btn(setupInput.trim() ? MINT : SURFACE_ALT, setupInput.trim() ? '#0B1D14' : TEXT_MUTED)}">${setupSaving ? 'Проверяем…' : 'Сохранить'}</button>
