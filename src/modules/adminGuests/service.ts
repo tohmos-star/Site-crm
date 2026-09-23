@@ -1,8 +1,18 @@
-import type { Guest, PrismaClient } from "@prisma/client";
+import type { Guest, GuestManualGroup, GuestLoyaltyState, LoyaltyTier, PrismaClient } from "@prisma/client";
 import { DomainError, NotFoundError } from "../../lib/errors.js";
 import { assignRandomDoorCode } from "../../lib/doorCode.js";
 import { BalanceService } from "../balance/service.js";
 import type { CreateGuestBody, UpdateGuestBody } from "./schemas.js";
+
+type GuestWithLoyalty = Guest & {
+  manualGroup: GuestManualGroup | null;
+  loyaltyState: (GuestLoyaltyState & { currentTier: LoyaltyTier | null }) | null;
+};
+
+const LOYALTY_INCLUDE = {
+  manualGroup: true,
+  loyaltyState: { include: { currentTier: true } },
+} as const;
 
 // Façade поверх реального Guest/BalanceLedger — фигура ответа {id, phone,
 // fio, bonusPoints, verification} подобрана под уже готовую вкладку
@@ -19,6 +29,7 @@ export class AdminGuestsService {
       where: search ? { phone: { contains: search } } : undefined,
       orderBy: { createdAt: "desc" },
       take: 200,
+      include: LOYALTY_INCLUDE,
     });
     return Promise.all(guests.map((g) => this.toFacade(g)));
   }
@@ -35,6 +46,7 @@ export class AdminGuestsService {
         regStatus: "APPROVED",
         doorCode,
       },
+      include: LOYALTY_INCLUDE,
     });
     return this.toFacade(guest);
   }
@@ -62,6 +74,7 @@ export class AdminGuestsService {
         phone: body.phone,
         fullName: body.fio,
       },
+      include: LOYALTY_INCLUDE,
     });
     return this.toFacade(updated);
   }
@@ -77,7 +90,11 @@ export class AdminGuestsService {
     if (!doorCode) {
       throw new DomainError("NO_DOOR_CODES", "В клубе ещё не задано ни одного кода двери (вкладка «Домофон и коды»)", 409);
     }
-    const updated = await this.prisma.guest.update({ where: { id }, data: { doorCode } });
+    const updated = await this.prisma.guest.update({
+      where: { id },
+      data: { doorCode },
+      include: LOYALTY_INCLUDE,
+    });
     return this.toFacade(updated);
   }
 
@@ -104,7 +121,7 @@ export class AdminGuestsService {
     await this.prisma.guest.delete({ where: { id } });
   }
 
-  private async toFacade(guest: Guest) {
+  private async toFacade(guest: GuestWithLoyalty) {
     const bonus = await this.balance.getBalance(guest.id, "BONUS");
     return {
       id: guest.id,
@@ -112,6 +129,10 @@ export class AdminGuestsService {
       fio: guest.fullName,
       bonusPoints: Number(bonus),
       doorCode: guest.doorCode,
+      manualGroupId: guest.manualGroupId,
+      manualGroupName: guest.manualGroup?.name ?? null,
+      tierId: guest.loyaltyState?.currentTierId ?? null,
+      tierName: guest.loyaltyState?.currentTier?.name ?? null,
       verification:
         guest.regStatus === "PENDING" || guest.regStatus === "REJECTED" || guest.passwordHash
           ? { status: guest.regStatus.toLowerCase() }

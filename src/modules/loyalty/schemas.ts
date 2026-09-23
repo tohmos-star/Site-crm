@@ -54,3 +54,13 @@ export type IdParams = Static<typeof IdParams>;
 
 export const GuestIdParams = Type.Object({ guestId: Type.String() });
 export type GuestIdParams = Static<typeof GuestIdParams>;
+
+export const SetManualGroupBody = Type.Object({
+  manualGroupId: Type.Union([Type.String(), Type.Null()]),
+});
+export type SetManualGroupBody = Static<typeof SetManualGroupBody>;
+
+export const SetTierBody = Type.Object({
+  tierId: Type.Union([Type.String(), Type.Null()]),
+});
+export type SetTierBody = Static<typeof SetTierBody>;

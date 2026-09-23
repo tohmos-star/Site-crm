@@ -131,3 +131,38 @@ jobs:
             exit 1
           fi
           echo "OK: tiered TOPUP auto-bonus rule create + delete round-trip works"
+
+          echo "== Группы лояльности: назначение ручной группы и автогруппы гостю (в анкете) =="
+          GUEST_ID=$(echo "$GUESTS" | jq -r '.[0].id // empty')
+          MANUAL_GROUP_ID=$(curl -fsS "$BASE/api/loyalty/manual-groups" -H "Authorization: Bearer $TOKEN" | jq -r '.[0].id // empty')
+          TIER_ID=$(curl -fsS "$BASE/api/loyalty/tiers" -H "Authorization: Bearer $TOKEN" | jq -r '.[0].id // empty')
+          if [ -z "$GUEST_ID" ] || [ -z "$MANUAL_GROUP_ID" ] || [ -z "$TIER_ID" ]; then
+            echo "Нет гостя/ручной группы/тира для проверки — пропускаю" >&2
+          else
+            # Запоминаем исходные значения, чтобы вернуть их после теста и не испортить реальные данные гостя.
+            ORIG_MANUAL_GROUP=$(echo "$GUESTS" | jq -r '.[0].manualGroupId // "null"')
+            ORIG_TIER=$(echo "$GUESTS" | jq -r '.[0].tierId // "null"')
+
+            curl -fsS -X PUT "$BASE/api/guests/$GUEST_ID/manual-group" -H "Authorization: Bearer $TOKEN" \
+              -H 'Content-Type: application/json' -d "{\"manualGroupId\":\"$MANUAL_GROUP_ID\"}" > /dev/null
+            curl -fsS -X PUT "$BASE/api/guests/$GUEST_ID/tier" -H "Authorization: Bearer $TOKEN" \
+              -H 'Content-Type: application/json' -d "{\"tierId\":\"$TIER_ID\"}" > /dev/null
+
+            AFTER=$(curl -fsS "$BASE/api/admin/guests" -H "Authorization: Bearer $TOKEN" | jq --arg id "$GUEST_ID" '.[] | select(.id == $id) | {manualGroupId, manualGroupName, tierId, tierName}')
+            echo "$AFTER"
+            AFTER_MANUAL=$(echo "$AFTER" | jq -r '.manualGroupId')
+            AFTER_TIER=$(echo "$AFTER" | jq -r '.tierId')
+            if [ "$AFTER_MANUAL" != "$MANUAL_GROUP_ID" ] || [ "$AFTER_TIER" != "$TIER_ID" ]; then
+              echo "Назначение группы/тира гостю не применилось" >&2
+              exit 1
+            fi
+
+            # Возвращаем исходные значения гостя.
+            ORIG_MANUAL_JSON=$([ "$ORIG_MANUAL_GROUP" = "null" ] && echo null || echo "\"$ORIG_MANUAL_GROUP\"")
+            ORIG_TIER_JSON=$([ "$ORIG_TIER" = "null" ] && echo null || echo "\"$ORIG_TIER\"")
+            curl -fsS -X PUT "$BASE/api/guests/$GUEST_ID/manual-group" -H "Authorization: Bearer $TOKEN" \
+              -H 'Content-Type: application/json' -d "{\"manualGroupId\":$ORIG_MANUAL_JSON}" > /dev/null
+            curl -fsS -X PUT "$BASE/api/guests/$GUEST_ID/tier" -H "Authorization: Bearer $TOKEN" \
+              -H 'Content-Type: application/json' -d "{\"tierId\":$ORIG_TIER_JSON}" > /dev/null
+            echo "OK: назначение ручной группы и автогруппы гостю работает (значения гостя возвращены к исходным)"
+          fi

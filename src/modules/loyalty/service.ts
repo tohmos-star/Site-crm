@@ -78,6 +78,34 @@ export class LoyaltyService {
     await this.prisma.autoBonusRule.delete({ where: { id } });
   }
 
+  // Ручная группа — назначается сотрудником напрямую на гостя (Guest.manualGroupId).
+  async setManualGroup(guestId: string, manualGroupId: string | null) {
+    const guest = await this.prisma.guest.findUnique({ where: { id: guestId } });
+    if (!guest) throw new NotFoundError("Guest", guestId);
+    if (manualGroupId) {
+      const group = await this.prisma.guestManualGroup.findUnique({ where: { id: manualGroupId } });
+      if (!group) throw new NotFoundError("GuestManualGroup", manualGroupId);
+    }
+    return this.prisma.guest.update({ where: { id: guestId }, data: { manualGroupId } });
+  }
+
+  // Автогруппа (уровень лояльности) обычно пересчитывается по отыгранным
+  // часам (см. recalcGuestTier), но админ может назначить/переопределить её
+  // вручную прямо в анкете гостя — например, до накопления нужных часов.
+  async setTier(guestId: string, tierId: string | null) {
+    const guest = await this.prisma.guest.findUnique({ where: { id: guestId } });
+    if (!guest) throw new NotFoundError("Guest", guestId);
+    if (tierId) {
+      const tier = await this.prisma.loyaltyTier.findUnique({ where: { id: tierId } });
+      if (!tier) throw new NotFoundError("LoyaltyTier", tierId);
+    }
+    return this.prisma.guestLoyaltyState.upsert({
+      where: { guestId },
+      create: { guestId, currentTierId: tierId },
+      update: { currentTierId: tierId },
+    });
+  }
+
   // --- Discounts / cashback ---------------------------------------------------
 
   // Комбинирует авто-группу (по отыгранным часам) и ручную группу гостя.

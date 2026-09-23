@@ -227,17 +227,28 @@ function initAccessForm() {
 // 3. Гости
 // ---------------------------------------------------------------------
 
+const SELECT_STYLE = 'background:var(--bg); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:5px 7px; font-size:12px;';
+
+function loyaltySelectOptions(items, selectedId) {
+  return '<option value="">— нет —</option>' +
+    items.map(i => `<option value="${i.id}" ${i.id === selectedId ? 'selected' : ''}>${escapeHtml(i.name)}</option>`).join('');
+}
+
 async function loadGuests(search) {
   const tbody = document.getElementById('gTableBody');
-  tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);">Загрузка…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted);">Загрузка…</td></tr>';
 
   try {
     const url = search ? `/api/admin/guests?search=${encodeURIComponent(search)}` : '/api/admin/guests';
-    const res = await adminFetch(url);
+    const [res] = await Promise.all([
+      adminFetch(url),
+      TIERS_CACHE.length ? Promise.resolve() : loadLoyaltyTiers(),
+      MANUAL_GROUPS_CACHE.length ? Promise.resolve() : loadManualGroups(),
+    ]);
     const guests = await res.json();
 
     if (!guests.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);">Никого не найдено</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted);">Никого не найдено</td></tr>';
       return;
     }
 
@@ -250,6 +261,13 @@ async function loadGuests(search) {
           ? escapeHtml(g.doorCode)
           : `<button class="btn btn-ghost" data-assign-door-code="${g.id}" style="padding:4px 8px; font-size:12px;">Назначить код</button>`
         }</td>
+        <td><select class="g-manual-group" data-field="manualGroupId" style="${SELECT_STYLE} width:130px;">${loyaltySelectOptions(MANUAL_GROUPS_CACHE, g.manualGroupId)}</select></td>
+        <td>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <select class="g-tier" data-field="tierId" style="${SELECT_STYLE} width:130px;">${loyaltySelectOptions(TIERS_CACHE, g.tierId)}</select>
+            <button class="btn btn-ghost" data-recalc-tier="${g.id}" title="Пересчитать автоматически по отыгранным часам" style="padding:4px 6px; font-size:11px;">↻</button>
+          </div>
+        </td>
         <td><span class="badge">${g.verification ? g.verification.status : 'нет анкеты'}</span></td>
         <td>
           <div class="row-actions">
@@ -259,7 +277,7 @@ async function loadGuests(search) {
           </div>
         </td>
       </tr>
-      <tr class="g-history-row" data-history-row="${g.id}" style="display:none;"><td colspan="6"></td></tr>
+      <tr class="g-history-row" data-history-row="${g.id}" style="display:none;"><td colspan="8"></td></tr>
     `).join('');
 
     tbody.querySelectorAll('[data-save-guest]').forEach(btn => {
@@ -274,9 +292,12 @@ async function loadGuests(search) {
     tbody.querySelectorAll('[data-assign-door-code]').forEach(btn => {
       btn.addEventListener('click', () => assignDoorCode(btn.dataset.assignDoorCode));
     });
+    tbody.querySelectorAll('[data-recalc-tier]').forEach(btn => {
+      btn.addEventListener('click', () => recalcGuestTier(btn.dataset.recalcTier));
+    });
   } catch (err) {
     if (err.message !== 'unauthorized' && err.message !== 'no token') {
-      tbody.innerHTML = '<tr><td colspan="6" style="color:var(--accent);">Не удалось загрузить</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="color:var(--accent);">Не удалось загрузить</td></tr>';
     }
   }
 }
@@ -347,12 +368,31 @@ async function saveGuest(id) {
   const phone = row.querySelector('[data-field="phone"]').value.trim();
   const fio = row.querySelector('[data-field="fio"]').value.trim();
   const bonusPoints = Number(row.querySelector('[data-field="bonusPoints"]').value);
+  const manualGroupId = row.querySelector('[data-field="manualGroupId"]').value || null;
+  const tierId = row.querySelector('[data-field="tierId"]').value || null;
 
-  await adminFetch(`/api/admin/guests/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone, fio, bonusPoints }),
-  });
+  await Promise.all([
+    adminFetch(`/api/admin/guests/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, fio, bonusPoints }),
+    }),
+    adminFetch(`/api/guests/${id}/manual-group`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ manualGroupId }),
+    }),
+    adminFetch(`/api/guests/${id}/tier`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tierId }),
+    }),
+  ]);
+}
+
+async function recalcGuestTier(id) {
+  await adminFetch(`/api/guests/${id}/loyalty/recalculate`, { method: 'POST' });
+  loadGuests(document.getElementById('gSearch').value.trim());
 }
 
 async function assignDoorCode(id) {
@@ -413,6 +453,8 @@ let ZONES_CACHE = [];
 let TARIFFS_CACHE = [];
 let TARIFF_GROUPS_CACHE = [];
 let DAY_TYPES_CACHE = [];
+let TIERS_CACHE = [];
+let MANUAL_GROUPS_CACHE = [];
 let currentRulesTariffId = null;
 
 const DEVICE_STATUS_LABELS = {
@@ -825,6 +867,7 @@ async function loadLoyaltyTiers() {
   const tbody = document.getElementById('ltTableBody');
   const res = await adminFetch('/api/loyalty/tiers');
   const tiers = await res.json();
+  TIERS_CACHE = tiers;
   if (!tiers.length) {
     tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);">Пусто</td></tr>';
     return;
@@ -868,6 +911,7 @@ async function loadManualGroups() {
   const tbody = document.getElementById('mgTableBody');
   const res = await adminFetch('/api/loyalty/manual-groups');
   const groups = await res.json();
+  MANUAL_GROUPS_CACHE = groups;
   if (!groups.length) {
     tbody.innerHTML = '<tr><td colspan="2" style="color:var(--text-muted);">Пусто</td></tr>';
     return;

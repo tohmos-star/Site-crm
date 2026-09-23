@@ -7,6 +7,8 @@ import {
   IdParams,
   LoyaltySettingsBody,
   LoyaltyTierBody,
+  SetManualGroupBody,
+  SetTierBody,
 } from "./schemas.js";
 import { LoyaltyService } from "./service.js";
 
@@ -68,6 +70,24 @@ const loyaltyRoutes: FastifyPluginAsync = async (fastify) => {
     schema: { params: GuestIdParams },
     handler: async (request) =>
       service.recalcGuestTier((request.params as { guestId: string }).guestId),
+  });
+
+  fastify.put("/guests/:guestId/manual-group", {
+    schema: { params: GuestIdParams, body: SetManualGroupBody },
+    handler: async (request) => {
+      const { guestId } = request.params as { guestId: string };
+      const { manualGroupId } = request.body as { manualGroupId: string | null };
+      return service.setManualGroup(guestId, manualGroupId);
+    },
+  });
+
+  fastify.put("/guests/:guestId/tier", {
+    schema: { params: GuestIdParams, body: SetTierBody },
+    handler: async (request) => {
+      const { guestId } = request.params as { guestId: string };
+      const { tierId } = request.body as { tierId: string | null };
+      return service.setTier(guestId, tierId);
+    },
   });
 
   fastify.post("/guests/:guestId/loyalty/birthday-bonus", {
