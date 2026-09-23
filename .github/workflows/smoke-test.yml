@@ -166,3 +166,35 @@ jobs:
               -H 'Content-Type: application/json' -d "{\"tierId\":$ORIG_TIER_JSON}" > /dev/null
             echo "OK: назначение ручной группы и автогруппы гостю работает (значения гостя возвращены к исходным)"
           fi
+
+          echo "== Зоны: создание, PATCH цвета, защита удаления при наличии устройств/правил цен =="
+          ZONE=$(curl -fsS -X POST "$BASE/api/zones" -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: application/json' -d "{\"clubId\":\"$CLUB_ID\",\"nameRu\":\"SMOKE_TEST_ZONE\",\"nameEn\":\"SMOKE_TEST_ZONE\",\"color\":\"#123456\"}")
+          ZONE_ID=$(echo "$ZONE" | jq -r '.id // empty')
+          if [ -z "$ZONE_ID" ]; then
+            echo "Failed to create zone, response: $ZONE" >&2
+            exit 1
+          fi
+          echo "== PATCH /api/zones/$ZONE_ID (цвет) =="
+          curl -fsS -X PATCH "$BASE/api/zones/$ZONE_ID" -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: application/json' -d '{"color":"#abcdef"}' | jq '{nameRu, color}'
+          echo "== DELETE /api/zones/$ZONE_ID (без устройств/правил -> 204) =="
+          DELETE_ZONE_CODE=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE/api/zones/$ZONE_ID" -H "Authorization: Bearer $TOKEN")
+          echo "DELETE -> $DELETE_ZONE_CODE"
+          if [ "$DELETE_ZONE_CODE" != "204" ]; then
+            echo "Expected 204 deleting an empty zone, got $DELETE_ZONE_CODE" >&2
+            exit 1
+          fi
+
+          ZONE_WITH_DEVICES=$(curl -fsS "$BASE/api/zones?clubId=$CLUB_ID" -H "Authorization: Bearer $TOKEN" | jq -r '.[0].id // empty')
+          if [ -n "$ZONE_WITH_DEVICES" ]; then
+            echo "== DELETE /api/zones/$ZONE_WITH_DEVICES (с устройствами -> ожидаем 409, не 500) =="
+            DEPS_RESP=$(curl -s -w '\nSTATUS:%{http_code}' -X DELETE "$BASE/api/zones/$ZONE_WITH_DEVICES" -H "Authorization: Bearer $TOKEN")
+            echo "$DEPS_RESP"
+            DEPS_CODE=$(echo "$DEPS_RESP" | tail -1 | cut -d: -f2)
+            if [ "$DEPS_CODE" != "409" ]; then
+              echo "Expected 409 (zone has dependencies), got $DEPS_CODE" >&2
+              exit 1
+            fi
+          fi
+          echo "OK: zones create/PATCH color/delete-guard all work as expected"

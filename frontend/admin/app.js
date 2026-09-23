@@ -624,7 +624,7 @@ let zoneEditingId = null;
 
 async function loadZones() {
   const tbody = document.getElementById('zTableBody');
-  tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);">Загрузка…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted);">Загрузка…</td></tr>';
   try {
     const res = await adminFetch(`/api/zones?clubId=${CLUB_ID}`);
     ZONES_CACHE = await res.json();
@@ -632,63 +632,66 @@ async function loadZones() {
     renderZonesTable();
   } catch (err) {
     if (err.message !== 'unauthorized' && err.message !== 'no token') {
-      tbody.innerHTML = '<tr><td colspan="6" style="color:var(--accent);">Не удалось загрузить</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" style="color:var(--accent);">Не удалось загрузить</td></tr>';
     }
   }
 }
 
+const ZONE_ARROW_STYLE = 'background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:9px; padding:0; line-height:1;';
+
 function renderZonesTable() {
   const tbody = document.getElementById('zTableBody');
   if (!ZONES_CACHE.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);">Пусто</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted);">Пусто</td></tr>';
     return;
   }
-  const tariffOpts = '<option value="">— не выбран —</option>' +
-    TARIFFS_CACHE.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
 
-  tbody.innerHTML = ZONES_CACHE.map(z => {
-    if (z.id === zoneEditingId) {
-      return `
-        <tr data-zone-row="${z.id}">
-          <td><input type="text" class="z-edit-name" value="${escapeHtml(z.nameRu)}" style="${SELECT_STYLE} width:110px;"></td>
-          <td><input type="text" class="z-edit-nameEn" value="${escapeHtml(z.nameEn || '')}" style="${SELECT_STYLE} width:110px;"></td>
-          <td><input type="number" class="z-edit-sort" value="${z.sortOrder}" style="${SELECT_STYLE} width:70px;"></td>
-          <td><input type="color" class="z-edit-color" value="${z.color}" style="width:40px; height:30px; padding:2px; border:1px solid var(--border); border-radius:5px; background:var(--bg);"></td>
-          <td><select class="z-default-tariff" data-zone-id="${z.id}" style="${SELECT_STYLE} width:150px;">${tariffOpts}</select></td>
-          <td>
-            <div class="row-actions">
-              <button class="btn btn-ghost" data-save-zone="${z.id}" title="Сохранить" style="padding:4px 8px; color:#4ADE9C;">✓</button>
-              <button class="btn btn-ghost" data-cancel-zone="${z.id}" title="Отмена" style="padding:4px 8px; color:var(--accent);">✗</button>
-            </div>
-          </td>
-        </tr>`;
-    }
+  tbody.innerHTML = ZONES_CACHE.map((z, i) => {
+    const nameCell = z.id === zoneEditingId
+      ? `<input type="text" class="z-edit-name" value="${escapeHtml(z.nameRu)}" style="${SELECT_STYLE} width:110px;">`
+      : escapeHtml(z.nameRu);
+    const arrows = `
+      <div style="display:flex; flex-direction:column;">
+        <button type="button" data-move-up="${z.id}" title="Выше" style="${ZONE_ARROW_STYLE}" ${i === 0 ? 'disabled' : ''}>▲</button>
+        <button type="button" data-move-down="${z.id}" title="Ниже" style="${ZONE_ARROW_STYLE}" ${i === ZONES_CACHE.length - 1 ? 'disabled' : ''}>▼</button>
+      </div>`;
+    const nameEnCell = z.id === zoneEditingId
+      ? `<input type="text" class="z-edit-nameEn" value="${escapeHtml(z.nameEn || '')}" style="${SELECT_STYLE} width:110px;">`
+      : escapeHtml(z.nameEn || '—');
+    const colorCell = `<input type="color" class="z-color-picker" data-zone-id="${z.id}" value="${z.color}" style="width:40px; height:30px; padding:2px; border:1px solid var(--border); border-radius:5px; background:var(--bg); cursor:pointer;">`;
+    const actionsCell = z.id === zoneEditingId
+      ? `<div class="row-actions">
+          <button class="btn btn-ghost" data-save-zone="${z.id}" title="Сохранить" style="padding:4px 8px; color:#4ADE9C;">✓</button>
+          <button class="btn btn-ghost" data-cancel-zone="${z.id}" title="Отмена" style="padding:4px 8px; color:var(--accent);">✗</button>
+        </div>`
+      : `<div class="row-actions">
+          <button class="btn btn-ghost" data-edit-zone="${z.id}" title="Редактировать" style="padding:4px 8px;">✎</button>
+          <button class="btn btn-ghost" data-delete-zone="${z.id}" title="Удалить" style="padding:4px 8px;">🗑</button>
+        </div>`;
+
     return `
       <tr data-zone-row="${z.id}">
-        <td>${escapeHtml(z.nameRu)}</td>
-        <td>${escapeHtml(z.nameEn || '—')}</td>
-        <td>${z.sortOrder}</td>
-        <td><span style="display:inline-block; width:18px; height:18px; border-radius:4px; vertical-align:middle; background:${escapeHtml(z.color)}; border:1px solid var(--border);"></span></td>
-        <td><select class="z-default-tariff" data-zone-id="${z.id}" style="${SELECT_STYLE} width:150px;">${tariffOpts}</select></td>
-        <td>
-          <div class="row-actions">
-            <button class="btn btn-ghost" data-edit-zone="${z.id}" title="Редактировать" style="padding:4px 8px;">✎</button>
-            <button class="btn btn-ghost" data-delete-zone="${z.id}" title="Удалить" style="padding:4px 8px;">🗑</button>
-          </div>
-        </td>
+        <td><div style="display:flex; align-items:center; gap:8px;">${arrows}<span>${nameCell}</span></div></td>
+        <td>${nameEnCell}</td>
+        <td>${colorCell}</td>
+        <td>${actionsCell}</td>
       </tr>`;
   }).join('');
 
-  tbody.querySelectorAll('.z-default-tariff').forEach(sel => {
-    const z = ZONES_CACHE.find(zz => zz.id === sel.dataset.zoneId);
-    if (z?.defaultTariffId) sel.value = z.defaultTariffId;
-    sel.addEventListener('change', async () => {
-      await adminFetch(`/api/zones/${sel.dataset.zoneId}`, {
+  tbody.querySelectorAll('[data-move-up]').forEach(btn => {
+    btn.addEventListener('click', () => moveZone(btn.dataset.moveUp, 'up'));
+  });
+  tbody.querySelectorAll('[data-move-down]').forEach(btn => {
+    btn.addEventListener('click', () => moveZone(btn.dataset.moveDown, 'down'));
+  });
+  tbody.querySelectorAll('.z-color-picker').forEach(input => {
+    input.addEventListener('change', async () => {
+      await adminFetch(`/api/zones/${input.dataset.zoneId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ defaultTariffId: sel.value || null }),
+        body: JSON.stringify({ color: input.value }),
       });
-      const zone = ZONES_CACHE.find(zz => zz.id === sel.dataset.zoneId);
-      if (zone) zone.defaultTariffId = sel.value || null;
+      const zone = ZONES_CACHE.find(zz => zz.id === input.dataset.zoneId);
+      if (zone) zone.color = input.value;
     });
   });
   tbody.querySelectorAll('[data-edit-zone]').forEach(btn => {
@@ -709,22 +712,41 @@ function renderZonesTable() {
   tbody.querySelectorAll('[data-delete-zone]').forEach(btn => {
     btn.addEventListener('click', async () => {
       if (!confirm('Удалить зону? Устройства в ней нужно удалить/перенести отдельно.')) return;
-      await adminFetch(`/api/zones/${btn.dataset.deleteZone}`, { method: 'DELETE' });
+      const res = await adminFetch(`/api/zones/${btn.dataset.deleteZone}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        alert(data?.error || 'Не удалось удалить зону.');
+        return;
+      }
       loadZones();
     });
   });
+}
+
+async function moveZone(id, direction) {
+  const idx = ZONES_CACHE.findIndex(z => z.id === id);
+  const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+  if (idx === -1 || swapIdx < 0 || swapIdx >= ZONES_CACHE.length) return;
+  const reordered = ZONES_CACHE.slice();
+  [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
+  // Переприсваиваем sortOrder = позиция в новом порядке всем зонам разом —
+  // это самолечит "хвосты" из старых зон, у которых sortOrder мог совпадать
+  // (например, все нули по умолчанию), а не просто меняет местами значения.
+  await Promise.all(reordered.map((z, i) => adminFetch(`/api/zones/${z.id}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sortOrder: i }),
+  })));
+  loadZones();
 }
 
 async function saveZoneEdit(id) {
   const row = document.querySelector(`[data-zone-row="${id}"]`);
   const nameRu = row.querySelector('.z-edit-name').value.trim();
   const nameEn = row.querySelector('.z-edit-nameEn').value.trim();
-  const sortOrder = Number(row.querySelector('.z-edit-sort').value) || 0;
-  const color = row.querySelector('.z-edit-color').value;
   if (!nameRu) return;
   await adminFetch(`/api/zones/${id}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nameRu, nameEn, sortOrder, color }),
+    body: JSON.stringify({ nameRu, nameEn }),
   });
   zoneEditingId = null;
   loadZones();
