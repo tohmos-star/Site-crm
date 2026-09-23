@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -242,5 +243,35 @@ public partial class MainWindow : Window
     private void SupportButton_Click(object sender, RoutedEventArgs e)
     {
         new SupportWindow { Owner = this }.ShowDialog();
+    }
+
+    // В отличие от frontend/pc-widget.html (где "Перезагрузить" — просто
+    // анимация), здесь это нативное приложение и вызывает настоящую
+    // перезагрузку Windows через shutdown.exe. Сессия/оплаченное время при
+    // этом не трогаем — это чисто перезагрузка ОС по просьбе гостя.
+    private void RebootButton_Click(object sender, RoutedEventArgs e)
+    {
+        var confirmed = MessageBox.Show(
+            "Перезагрузить ПК? Оплаченное время не пострадает, компьютер уйдёт в перезагрузку через несколько секунд.",
+            "Подтверждение",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question) == MessageBoxResult.Yes;
+        if (!confirmed) return;
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "shutdown",
+                Arguments = "/r /t 5 /c \"Перезагрузка запрошена гостем через 404 PC Agent\"",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+            });
+        }
+        catch (Exception ex)
+        {
+            SessionErrorText.Text = $"Не удалось запустить перезагрузку: {ex.Message}";
+            SessionErrorText.Visibility = Visibility.Visible;
+        }
     }
 }

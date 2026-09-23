@@ -47,9 +47,11 @@
             <UniformGrid Columns="2" Rows="1" Margin="0,8,0,0">
                 <Button x:Name="CompleteButton" Content="Завершить" Margin="0,0,4,0" Padding="0,10"
                         Background="#212B38" Foreground="#E7ECF3" BorderThickness="0" Click="CompleteButton_Click"/>
-                <Button x:Name="SupportButton" Content="Техподдержка" Margin="4,0,0,0" Padding="0,10"
-                        Background="#1A212B" Foreground="#8592A3" BorderThickness="0" Click="SupportButton_Click"/>
+                <Button x:Name="RebootButton" Content="Перезагрузить" Margin="4,0,0,0" Padding="0,10"
+                        Background="#212B38" Foreground="#F2A93B" BorderThickness="0" Click="RebootButton_Click"/>
             </UniformGrid>
+            <Button x:Name="SupportButton" Content="Техподдержка" Margin="0,8,0,0" Padding="0,10"
+                    Background="#1A212B" Foreground="#8592A3" BorderThickness="0" Click="SupportButton_Click"/>
             <TextBlock x:Name="SessionErrorText" Foreground="#F0555A" FontSize="12" Margin="0,10,0,0"
                        TextWrapping="Wrap" TextAlignment="Center" Visibility="Collapsed"/>
         </StackPanel>
