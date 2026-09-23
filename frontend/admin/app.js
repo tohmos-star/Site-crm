@@ -518,12 +518,13 @@ async function loadDevices() {
       return;
     }
     tbody.innerHTML = devices.map(d => {
-      const zone = ZONES_CACHE.find(z => z.id === d.zoneId);
       const statusOpts = Object.entries(DEVICE_STATUS_LABELS)
         .map(([k, v]) => `<option value="${k}" ${k === d.status ? 'selected' : ''}>${v}</option>`).join('');
+      const zoneOpts = ZONES_CACHE
+        .map(z => `<option value="${z.id}" ${z.id === d.zoneId ? 'selected' : ''}>${escapeHtml(z.nameRu)}</option>`).join('');
       return `
         <tr data-device-row="${d.id}">
-          <td>${escapeHtml(zone?.nameRu || '—')}</td>
+          <td><select class="d-zone-select" data-device-id="${d.id}" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:5px; font-size:12px;">${zoneOpts}</select></td>
           <td>${escapeHtml(d.name)}</td>
           <td>${d.cardNumber}</td>
           <td><select class="d-status-select" data-device-id="${d.id}" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:5px; font-size:12px;">${statusOpts}</select></td>
@@ -548,6 +549,20 @@ async function loadDevices() {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: sel.value }),
         });
+      });
+    });
+    tbody.querySelectorAll('.d-zone-select').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        const res = await adminFetch(`/api/devices/${sel.dataset.deviceId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ zoneId: sel.value }),
+        });
+        if (!res.ok) {
+          alert('Не удалось перенести устройство в другую зону.');
+          loadDevices();
+          return;
+        }
+        loadDevices();
       });
     });
     tbody.querySelectorAll('[data-issue-token]').forEach(btn => {
