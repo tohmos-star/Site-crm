@@ -620,74 +620,139 @@ function initDevicesTab() {
 // Зоны
 // ---------------------------------------------------------------------
 
+let zoneEditingId = null;
+
 async function loadZones() {
   const tbody = document.getElementById('zTableBody');
-  tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted);">Загрузка…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);">Загрузка…</td></tr>';
   try {
     const res = await adminFetch(`/api/zones?clubId=${CLUB_ID}`);
     ZONES_CACHE = await res.json();
     populateZoneSelects();
-
-    if (!ZONES_CACHE.length) {
-      tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted);">Пусто</td></tr>';
-      return;
-    }
-    const tariffOpts = '<option value="">— не выбран —</option>' +
-      TARIFFS_CACHE.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
-
-    tbody.innerHTML = ZONES_CACHE.map(z => `
-      <tr data-zone-row="${z.id}">
-        <td>${escapeHtml(z.nameRu)}</td>
-        <td>${z.isRoom ? 'да' : 'нет'}</td>
-        <td>
-          <select class="z-default-tariff" data-zone-id="${z.id}" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:5px; font-size:12px;">
-            ${tariffOpts}
-          </select>
-        </td>
-        <td><div class="row-actions"><button class="btn btn-ghost" data-delete-zone="${z.id}">Удалить</button></div></td>
-      </tr>
-    `).join('');
-
-    tbody.querySelectorAll('.z-default-tariff').forEach(sel => {
-      const z = ZONES_CACHE.find(zz => zz.id === sel.dataset.zoneId);
-      if (z?.defaultTariffId) sel.value = z.defaultTariffId;
-      sel.addEventListener('change', async () => {
-        await adminFetch(`/api/zones/${sel.dataset.zoneId}`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ defaultTariffId: sel.value || null }),
-        });
-      });
-    });
-    tbody.querySelectorAll('[data-delete-zone]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        if (!confirm('Удалить зону? Устройства в ней нужно удалить/перенести отдельно.')) return;
-        await adminFetch(`/api/zones/${btn.dataset.deleteZone}`, { method: 'DELETE' });
-        loadZones();
-      });
-    });
+    renderZonesTable();
   } catch (err) {
     if (err.message !== 'unauthorized' && err.message !== 'no token') {
-      tbody.innerHTML = '<tr><td colspan="4" style="color:var(--accent);">Не удалось загрузить</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="color:var(--accent);">Не удалось загрузить</td></tr>';
     }
   }
 }
 
-function initZonesTab() {
-  const addForm = document.getElementById('zAddForm');
-  document.getElementById('zAddBtn').addEventListener('click', () => {
-    addForm.style.display = addForm.style.display === 'none' ? 'block' : 'none';
+function renderZonesTable() {
+  const tbody = document.getElementById('zTableBody');
+  if (!ZONES_CACHE.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);">Пусто</td></tr>';
+    return;
+  }
+  const tariffOpts = '<option value="">— не выбран —</option>' +
+    TARIFFS_CACHE.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+
+  tbody.innerHTML = ZONES_CACHE.map(z => {
+    if (z.id === zoneEditingId) {
+      return `
+        <tr data-zone-row="${z.id}">
+          <td><input type="text" class="z-edit-name" value="${escapeHtml(z.nameRu)}" style="${SELECT_STYLE} width:110px;"></td>
+          <td><input type="text" class="z-edit-nameEn" value="${escapeHtml(z.nameEn || '')}" style="${SELECT_STYLE} width:110px;"></td>
+          <td><input type="number" class="z-edit-sort" value="${z.sortOrder}" style="${SELECT_STYLE} width:70px;"></td>
+          <td><input type="color" class="z-edit-color" value="${z.color}" style="width:40px; height:30px; padding:2px; border:1px solid var(--border); border-radius:5px; background:var(--bg);"></td>
+          <td><select class="z-default-tariff" data-zone-id="${z.id}" style="${SELECT_STYLE} width:150px;">${tariffOpts}</select></td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn-ghost" data-save-zone="${z.id}" title="Сохранить" style="padding:4px 8px; color:#4ADE9C;">✓</button>
+              <button class="btn btn-ghost" data-cancel-zone="${z.id}" title="Отмена" style="padding:4px 8px; color:var(--accent);">✗</button>
+            </div>
+          </td>
+        </tr>`;
+    }
+    return `
+      <tr data-zone-row="${z.id}">
+        <td>${escapeHtml(z.nameRu)}</td>
+        <td>${escapeHtml(z.nameEn || '—')}</td>
+        <td>${z.sortOrder}</td>
+        <td><span style="display:inline-block; width:18px; height:18px; border-radius:4px; vertical-align:middle; background:${escapeHtml(z.color)}; border:1px solid var(--border);"></span></td>
+        <td><select class="z-default-tariff" data-zone-id="${z.id}" style="${SELECT_STYLE} width:150px;">${tariffOpts}</select></td>
+        <td>
+          <div class="row-actions">
+            <button class="btn btn-ghost" data-edit-zone="${z.id}" title="Редактировать" style="padding:4px 8px;">✎</button>
+            <button class="btn btn-ghost" data-delete-zone="${z.id}" title="Удалить" style="padding:4px 8px;">🗑</button>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('.z-default-tariff').forEach(sel => {
+    const z = ZONES_CACHE.find(zz => zz.id === sel.dataset.zoneId);
+    if (z?.defaultTariffId) sel.value = z.defaultTariffId;
+    sel.addEventListener('change', async () => {
+      await adminFetch(`/api/zones/${sel.dataset.zoneId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultTariffId: sel.value || null }),
+      });
+      const zone = ZONES_CACHE.find(zz => zz.id === sel.dataset.zoneId);
+      if (zone) zone.defaultTariffId = sel.value || null;
+    });
   });
-  document.getElementById('zAddSubmit').addEventListener('click', async () => {
-    const nameRu = document.getElementById('zNewName').value.trim();
-    const isRoom = document.getElementById('zNewIsRoom').checked;
+  tbody.querySelectorAll('[data-edit-zone]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      zoneEditingId = btn.dataset.editZone;
+      renderZonesTable();
+    });
+  });
+  tbody.querySelectorAll('[data-cancel-zone]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      zoneEditingId = null;
+      renderZonesTable();
+    });
+  });
+  tbody.querySelectorAll('[data-save-zone]').forEach(btn => {
+    btn.addEventListener('click', () => saveZoneEdit(btn.dataset.saveZone));
+  });
+  tbody.querySelectorAll('[data-delete-zone]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Удалить зону? Устройства в ней нужно удалить/перенести отдельно.')) return;
+      await adminFetch(`/api/zones/${btn.dataset.deleteZone}`, { method: 'DELETE' });
+      loadZones();
+    });
+  });
+}
+
+async function saveZoneEdit(id) {
+  const row = document.querySelector(`[data-zone-row="${id}"]`);
+  const nameRu = row.querySelector('.z-edit-name').value.trim();
+  const nameEn = row.querySelector('.z-edit-nameEn').value.trim();
+  const sortOrder = Number(row.querySelector('.z-edit-sort').value) || 0;
+  const color = row.querySelector('.z-edit-color').value;
+  if (!nameRu) return;
+  await adminFetch(`/api/zones/${id}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nameRu, nameEn, sortOrder, color }),
+  });
+  zoneEditingId = null;
+  loadZones();
+}
+
+function initZonesTab() {
+  const backdrop = document.getElementById('zModalBackdrop');
+  const closeModal = () => { backdrop.style.display = 'none'; };
+
+  document.getElementById('zAddBtn').addEventListener('click', () => {
+    document.getElementById('zModalName').value = '';
+    document.getElementById('zModalNameEn').value = '';
+    document.getElementById('zModalColor').value = '#f97316';
+    backdrop.style.display = 'flex';
+  });
+  document.getElementById('zModalClose').addEventListener('click', closeModal);
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
+
+  document.getElementById('zModalSave').addEventListener('click', async () => {
+    const nameRu = document.getElementById('zModalName').value.trim();
+    const nameEn = document.getElementById('zModalNameEn').value.trim();
+    const color = document.getElementById('zModalColor').value;
     if (!nameRu) return;
     await adminFetch('/api/zones', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clubId: CLUB_ID, nameRu, isRoom }),
+      body: JSON.stringify({ clubId: CLUB_ID, nameRu, nameEn: nameEn || undefined, color }),
     });
-    document.getElementById('zNewName').value = '';
-    document.getElementById('zNewIsRoom').checked = false;
-    addForm.style.display = 'none';
+    closeModal();
     loadZones();
   });
 }
