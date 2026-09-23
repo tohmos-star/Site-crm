@@ -8,15 +8,38 @@
   <style>
     .admin-header {
       border-bottom: 1px solid var(--border); position: sticky; top: 0;
-      background: rgba(11,12,14,0.95); backdrop-filter: blur(6px); z-index: 20;
+      background: rgba(11,12,14,0.95); backdrop-filter: blur(6px); z-index: 30;
     }
-    .admin-header .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; }
-    .tabs { display: flex; gap: 4px; padding: 12px 0; overflow-x: auto; border-bottom: 1px solid var(--border); }
-    .tab-btn {
-      background: none; border: 1px solid var(--border); color: var(--text-muted);
-      padding: 8px 14px; border-radius: 7px; font-size: 13px; cursor: pointer; white-space: nowrap;
+    .admin-header .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; gap: 12px; }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .menu-toggle {
+      background: none; border: 1px solid var(--border); color: var(--text);
+      width: 40px; height: 40px; border-radius: 7px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1;
     }
-    .tab-btn.active { color: var(--text); background: var(--panel); border-color: var(--accent); }
+
+    /* Боковое меню разделов — вместо ряда вкладок, см. запрос пользователя
+       "как у LANGAME": гамбургер в шапке открывает вертикальный список
+       поверх контента, выбор пункта закрывает меню. */
+    .side-menu-backdrop {
+      position: fixed; inset: 60px 0 0 0; background: rgba(0,0,0,0.5);
+      z-index: 25; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .side-menu-backdrop.open { opacity: 1; pointer-events: auto; }
+    .side-menu {
+      position: fixed; top: 60px; left: 0; bottom: 0; width: min(320px, 85vw);
+      background: var(--panel); border-right: 1px solid var(--border);
+      z-index: 26; transform: translateX(-100%); transition: transform 0.25s ease;
+      overflow-y: auto;
+    }
+    .side-menu.open { transform: translateX(0); }
+    .side-menu-item {
+      display: block; width: 100%; text-align: left; background: none; border: none;
+      border-bottom: 1px solid var(--border); color: var(--text-muted);
+      padding: 16px 20px; font-size: 14px; cursor: pointer;
+    }
+    .side-menu-item:hover { background: rgba(255,255,255,0.03); }
+    .side-menu-item.active { color: var(--text); background: rgba(255,90,31,0.08); border-left: 3px solid var(--accent); padding-left: 17px; }
     .tab-panel { display: none; padding: 24px 0; }
     .tab-panel.active { display: block; }
     table.admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -33,22 +56,26 @@
   <header class="admin-header">
     <div class="wrap">
       <span style="font-weight:700;">4<span style="color:var(--accent);">0</span>4 · admin</span>
-      <button class="btn btn-ghost" id="adminLogoutBtn" style="padding:8px 14px; font-size:13px;">Выйти</button>
+      <div class="header-actions">
+        <button class="btn btn-ghost" id="adminLogoutBtn" style="padding:8px 14px; font-size:13px;">Выйти</button>
+        <button class="menu-toggle" id="menuToggle" aria-label="Меню разделов">☰</button>
+      </div>
     </div>
   </header>
 
-  <main class="wrap">
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="verification">Верификация анкет</button>
-      <button class="tab-btn" data-tab="access">Домофон и коды</button>
-      <button class="tab-btn" data-tab="guests">Гости</button>
-      <button class="tab-btn" data-tab="devices">Устройства</button>
-      <button class="tab-btn" data-tab="zones">Зоны</button>
-      <button class="tab-btn" data-tab="tariffs">Тарифы</button>
-      <button class="tab-btn" data-tab="loyalty">Лояльность</button>
-      <button class="tab-btn" data-tab="analytics">Статистика</button>
-    </div>
+  <div class="side-menu-backdrop" id="sideMenuBackdrop"></div>
+  <nav class="side-menu" id="sideMenu">
+    <button class="side-menu-item active" data-tab="verification">Верификация анкет</button>
+    <button class="side-menu-item" data-tab="access">Домофон и коды</button>
+    <button class="side-menu-item" data-tab="guests">Гости</button>
+    <button class="side-menu-item" data-tab="devices">Устройства</button>
+    <button class="side-menu-item" data-tab="zones">Зоны</button>
+    <button class="side-menu-item" data-tab="tariffs">Тарифы</button>
+    <button class="side-menu-item" data-tab="loyalty">Лояльность</button>
+    <button class="side-menu-item" data-tab="analytics">Статистика</button>
+  </nav>
 
+  <main class="wrap">
     <!-- ---- 1. Верификация анкет ---- -->
     <section class="tab-panel active" id="tab-verification">
       <div class="filter-row">

@@ -36,16 +36,29 @@ function escapeHtml(str) {
 }
 
 // ---------------------------------------------------------------------
-// Tabs
+// Разделы (боковое меню вместо ряда вкладок)
 // ---------------------------------------------------------------------
 
 function initTabs() {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
+  const menu = document.getElementById('sideMenu');
+  const backdrop = document.getElementById('sideMenuBackdrop');
+  const toggle = document.getElementById('menuToggle');
+
+  const closeMenu = () => { menu.classList.remove('open'); backdrop.classList.remove('open'); };
+  const openMenu = () => { menu.classList.add('open'); backdrop.classList.add('open'); };
+
+  toggle.addEventListener('click', () => {
+    menu.classList.contains('open') ? closeMenu() : openMenu();
+  });
+  backdrop.addEventListener('click', closeMenu);
+
+  document.querySelectorAll('.side-menu-item').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.side-menu-item').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      closeMenu();
     });
   });
 }
