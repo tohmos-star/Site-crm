@@ -14,8 +14,13 @@ public partial class MainWindow : Window
 {
     private readonly ApiClient _api = new();
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(1) };
+    // Пока активной сессии нет (код ещё не введён, либо станция заблокирована
+    // после истечения времени), опрашиваем сервер — сессию теперь можно
+    // запустить удалённо (сайт/телефон), а не только вводом кода на месте.
+    private readonly DispatcherTimer _pollTimer = new() { Interval = TimeSpan.FromSeconds(10) };
     private readonly string? _deviceToken;
     private SessionInfo? _session;
+    private LockScreenWindow? _lockScreen;
     private bool _busy;
 
     public MainWindow() : this(null)
@@ -27,6 +32,8 @@ public partial class MainWindow : Window
         InitializeComponent();
         _deviceToken = deviceToken;
         _timer.Tick += Timer_Tick;
+        _pollTimer.Tick += async (_, _) => await CheckSessionAsync();
+        Closed += (_, _) => HideLockScreen();
 
         if (_deviceToken is not null)
         {
@@ -43,8 +50,9 @@ public partial class MainWindow : Window
     }
 
     // Проверяет, есть ли на этой станции активная сессия — вызывается при
-    // старте, а также когда локальный отсчёт времени дошёл до нуля (сервер
-    // — источник истины, локальный таймер только для отображения).
+    // старте, регулярно фоновым опросом, а также когда локальный отсчёт
+    // времени дошёл до нуля (сервер — источник истины, локальный таймер
+    // только для отображения).
     private async Task CheckSessionAsync()
     {
         ShowPanel(CheckingPanel);
@@ -58,9 +66,7 @@ public partial class MainWindow : Window
 
         if (!result.Ok)
         {
-            ShowPanel(CodePanel);
-            CodeErrorText.Text = result.ErrorMessage ?? "Нет связи с сервером";
-            CodeErrorText.Visibility = Visibility.Visible;
+            ShowNoSessionState(result.ErrorMessage ?? "Нет связи с сервером");
             return;
         }
 
@@ -70,19 +76,57 @@ public partial class MainWindow : Window
         }
         else
         {
-            _session = null;
-            _timer.Stop();
-            ShowPanel(CodePanel);
+            ShowNoSessionState(null);
         }
     }
 
     private void ApplySession(SessionInfo session)
     {
         _session = session;
+        LockStateStore.ClearLocked();
+        HideLockScreen();
+        _pollTimer.Stop();
         RenderSession();
         ShowPanel(SessionPanel);
         _timer.Stop();
         _timer.Start();
+    }
+
+    // Активной сессии нет: либо станция ещё ни разу не бронировалась (показываем
+    // обычный ввод кода), либо она заблокирована после истечения оплаченного
+    // времени (см. LockStateStore) — тогда вместо ввода кода показываем
+    // полноэкранный "экран блокировки". В обоих случаях включаем фоновый опрос,
+    // чтобы подхватить сессию, запущенную удалённо.
+    private void ShowNoSessionState(string? errorMessage)
+    {
+        _session = null;
+        _timer.Stop();
+        if (!_pollTimer.IsEnabled) _pollTimer.Start();
+
+        if (LockStateStore.IsLocked())
+        {
+            ShowPanel(CheckingPanel);
+            ShowLockScreen();
+            return;
+        }
+
+        HideLockScreen();
+        ShowPanel(CodePanel);
+        CodeErrorText.Visibility = errorMessage is null ? Visibility.Collapsed : Visibility.Visible;
+        if (errorMessage is not null) CodeErrorText.Text = errorMessage;
+    }
+
+    private void ShowLockScreen()
+    {
+        if (_lockScreen is not null) return;
+        _lockScreen = new LockScreenWindow();
+        _lockScreen.Closed += (_, _) => _lockScreen = null;
+        _lockScreen.Show();
+    }
+
+    private void HideLockScreen()
+    {
+        _lockScreen?.ForceClose();
     }
 
     private void RenderSession()
@@ -112,8 +156,39 @@ public partial class MainWindow : Window
         if (_session.EndsAt.ToLocalTime() <= DateTime.Now)
         {
             _timer.Stop();
-            await CheckSessionAsync();
+            await HandleSessionExpiredAsync();
         }
+    }
+
+    // Локальный отсчёт дошёл до нуля — сверяемся с сервером (вдруг гость
+    // успел продлить в последний момент удалённо) и, только если сессии
+    // действительно больше нет, перезагружаем ПК и показываем полноэкранную
+    // блокировку. Сетевую ошибку не считаем поводом для перезагрузки "вслепую".
+    private async Task HandleSessionExpiredAsync()
+    {
+        var result = await _api.GetSessionAsync(_deviceToken!);
+
+        if (result.Unauthorized)
+        {
+            ReturnToSetup();
+            return;
+        }
+
+        if (!result.Ok)
+        {
+            _timer.Start();
+            return;
+        }
+
+        if (result.Data is { } session)
+        {
+            ApplySession(session);
+            return;
+        }
+
+        LockStateStore.SetLocked();
+        ShowNoSessionState(null);
+        TriggerReboot("Оплаченное время закончилось — 404 PC Agent");
     }
 
     private void CodeInput_TextChanged(object sender, TextChangedEventArgs e)
@@ -168,6 +243,7 @@ public partial class MainWindow : Window
     private void ReturnToSetup()
     {
         DeviceTokenStore.Clear();
+        LockStateStore.ClearLocked();
         new SetupWindow().Show();
         Close();
     }
@@ -233,9 +309,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        _session = null;
-        _timer.Stop();
-        ShowPanel(CodePanel);
+        ShowNoSessionState(null);
     }
 
     // Заявка пока без реального бэкенда (см. PcAgent.Services и
@@ -258,12 +332,17 @@ public partial class MainWindow : Window
             MessageBoxImage.Question) == MessageBoxResult.Yes;
         if (!confirmed) return;
 
+        TriggerReboot("Перезагрузка запрошена гостем через 404 PC Agent");
+    }
+
+    private void TriggerReboot(string reasonComment)
+    {
         try
         {
             Process.Start(new ProcessStartInfo
             {
                 FileName = "shutdown",
-                Arguments = "/r /t 5 /c \"Перезагрузка запрошена гостем через 404 PC Agent\"",
+                Arguments = $"/r /t 5 /c \"{reasonComment}\"",
                 CreateNoWindow = true,
                 UseShellExecute = false,
             });
