@@ -457,10 +457,6 @@ let TIERS_CACHE = [];
 let MANUAL_GROUPS_CACHE = [];
 let currentRulesTariffId = null;
 
-const DEVICE_STATUS_LABELS = {
-  FREE: 'Свободно', BUSY: 'Занято', CONNECTING: 'Подключение',
-  TECH_MODE: 'Тех.режим', LOCKED: 'Заблокировано', DISABLED: 'Отключено',
-};
 const TARIFF_TYPE_LABELS = { BASE: 'Базовый', PACKAGE: 'Пакет', SUBSCRIPTION: 'Абонемент' };
 const WEEKDAY_LABELS = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
@@ -503,7 +499,7 @@ function populateZoneSelects() {
 
 async function loadDevices() {
   const tbody = document.getElementById('dTableBody');
-  tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);">Загрузка…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);">Загрузка…</td></tr>';
   const zoneId = document.getElementById('dZoneFilter').value;
   const params = new URLSearchParams();
   if (zoneId) params.set('zoneId', zoneId);
@@ -512,12 +508,10 @@ async function loadDevices() {
     const res = await adminFetch(`/api/devices?${params.toString()}`);
     const devices = await res.json();
     if (!devices.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);">Пусто</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);">Пусто</td></tr>';
       return;
     }
     tbody.innerHTML = devices.map(d => {
-      const statusOpts = Object.entries(DEVICE_STATUS_LABELS)
-        .map(([k, v]) => `<option value="${k}" ${k === d.status ? 'selected' : ''}>${v}</option>`).join('');
       const zoneOpts = ZONES_CACHE
         .map(z => `<option value="${z.id}" ${z.id === d.zoneId ? 'selected' : ''}>${escapeHtml(z.nameRu)}</option>`).join('');
       return `
@@ -525,7 +519,6 @@ async function loadDevices() {
           <td><select class="d-zone-select" data-device-id="${d.id}" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:5px; font-size:12px;">${zoneOpts}</select></td>
           <td>${escapeHtml(d.name)}</td>
           <td>${d.cardNumber}</td>
-          <td><select class="d-status-select" data-device-id="${d.id}" style="background:var(--bg); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:5px; font-size:12px;">${statusOpts}</select></td>
           <td>
             ${d.hasAgentToken
               ? `<span class="badge" style="color:var(--ok, #4ADE9C);">выдан</span> <button class="btn btn-ghost" data-revoke-token="${d.id}" style="font-size:11px; padding:4px 8px;">Отозвать</button>`
@@ -537,18 +530,10 @@ async function loadDevices() {
             </div>
           </td>
         </tr>
-        <tr class="d-token-row" data-token-row="${d.id}" style="display:none;"><td colspan="6"></td></tr>
+        <tr class="d-token-row" data-token-row="${d.id}" style="display:none;"><td colspan="5"></td></tr>
       `;
     }).join('');
 
-    tbody.querySelectorAll('.d-status-select').forEach(sel => {
-      sel.addEventListener('change', async () => {
-        await adminFetch(`/api/devices/${sel.dataset.deviceId}/status`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: sel.value }),
-        });
-      });
-    });
     tbody.querySelectorAll('.d-zone-select').forEach(sel => {
       sel.addEventListener('change', async () => {
         const res = await adminFetch(`/api/devices/${sel.dataset.deviceId}`, {
@@ -594,7 +579,7 @@ async function loadDevices() {
     });
   } catch (err) {
     if (err.message !== 'unauthorized' && err.message !== 'no token') {
-      tbody.innerHTML = '<tr><td colspan="6" style="color:var(--accent);">Не удалось загрузить</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--accent);">Не удалось загрузить</td></tr>';
     }
   }
 }
