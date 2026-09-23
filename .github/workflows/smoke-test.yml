@@ -104,3 +104,30 @@ jobs:
           else
             echo "== Нет гостей с doorCode: null — пропускаю проверку назначения =="
           fi
+
+          echo "== Автобонусы: создание тарифицированного правила пополнения (create + delete) =="
+          CLUB_ID=$(curl -fsS "$BASE/api/clubs" -H "Authorization: Bearer $TOKEN" | jq -r '.[0].id')
+          RULE=$(curl -fsS -X POST "$BASE/api/loyalty/auto-bonus-rules" -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d "{\"clubId\":\"$CLUB_ID\",\"trigger\":\"TOPUP\",\"rewardType\":\"PERCENT\",\"rewardValue\":20,\"minAmount\":1000,\"maxAmount\":2000}")
+          echo "$RULE" | jq '{id, trigger, minAmount, maxAmount, rewardValue}'
+          RULE_ID=$(echo "$RULE" | jq -r '.id')
+          if [ -z "$RULE_ID" ] || [ "$RULE_ID" = "null" ]; then
+            echo "Failed to create auto-bonus rule, response: $RULE" >&2
+            exit 1
+          fi
+          echo "== GET /api/loyalty/auto-bonus-rules (правило должно быть в списке TOPUP) =="
+          curl -fsS "$BASE/api/loyalty/auto-bonus-rules" -H "Authorization: Bearer $TOKEN" | jq --arg id "$RULE_ID" '[.[] | select(.id == $id)]'
+          echo "== DELETE /api/loyalty/auto-bonus-rules/$RULE_ID =="
+          DELETE_CODE=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$BASE/api/loyalty/auto-bonus-rules/$RULE_ID" -H "Authorization: Bearer $TOKEN")
+          echo "DELETE -> $DELETE_CODE"
+          if [ "$DELETE_CODE" != "204" ]; then
+            echo "Expected 204 on delete, got $DELETE_CODE" >&2
+            exit 1
+          fi
+          AFTER_DELETE=$(curl -fsS "$BASE/api/loyalty/auto-bonus-rules" -H "Authorization: Bearer $TOKEN" | jq --arg id "$RULE_ID" '[.[] | select(.id == $id)] | length')
+          if [ "$AFTER_DELETE" != "0" ]; then
+            echo "Rule still present after delete" >&2
+            exit 1
+          fi
+          echo "OK: tiered TOPUP auto-bonus rule create + delete round-trip works"

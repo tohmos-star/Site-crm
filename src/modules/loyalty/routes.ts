@@ -44,6 +44,13 @@ const loyaltyRoutes: FastifyPluginAsync = async (fastify) => {
       return service.createAutoBonusRule(request.body as never);
     },
   });
+  fastify.delete("/loyalty/auto-bonus-rules/:id", {
+    schema: { params: IdParams },
+    handler: async (request, reply) => {
+      await service.deleteAutoBonusRule((request.params as { id: string }).id);
+      reply.code(204);
+    },
+  });
 
   fastify.get("/guests/:guestId/loyalty", {
     schema: {

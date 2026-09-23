@@ -72,6 +72,12 @@ export class LoyaltyService {
     return this.prisma.autoBonusRule.create({ data: body });
   }
 
+  async deleteAutoBonusRule(id: string) {
+    const rule = await this.prisma.autoBonusRule.findUnique({ where: { id } });
+    if (!rule) throw new NotFoundError("AutoBonusRule", id);
+    await this.prisma.autoBonusRule.delete({ where: { id } });
+  }
+
   // --- Discounts / cashback ---------------------------------------------------
 
   // Комбинирует авто-группу (по отыгранным часам) и ручную группу гостя.

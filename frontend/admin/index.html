@@ -290,15 +290,28 @@
       </table>
 
       <h3 style="font-size:14px; margin:0 0 10px;">Автобонусы</h3>
+
+      <h4 style="font-size:13px; color:var(--text-muted); margin:0 0 8px;">Бонус за регистрацию</h4>
       <div class="filter-row">
-        <select id="abNewTrigger"><option value="REGISTRATION">При регистрации</option><option value="TOPUP">При пополнении</option></select>
-        <select id="abNewRewardType"><option value="PERCENT">% от суммы</option><option value="FIXED">Фикс. сумма</option></select>
-        <input type="number" id="abNewRewardValue" placeholder="Значение" style="width:100px;">
-        <button class="btn btn-primary" id="abAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить</button>
+        <select id="abRegRewardType"><option value="PERCENT">% от суммы</option><option value="FIXED">Фикс. сумма</option></select>
+        <input type="number" id="abRegRewardValue" placeholder="Значение" style="width:100px;">
+        <button class="btn btn-primary" id="abRegAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить</button>
+      </div>
+      <table class="admin-table" style="margin-bottom:24px;">
+        <thead><tr><th>Награда</th><th></th></tr></thead>
+        <tbody id="abRegTableBody"><tr><td colspan="2" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
+      </table>
+
+      <h4 style="font-size:13px; color:var(--text-muted); margin:0 0 8px;">Бонус за пополнение (кэшбэк по диапазону суммы)</h4>
+      <div class="filter-row">
+        <input type="number" id="abTopupFrom" placeholder="Сумма от" style="width:110px;">
+        <input type="number" id="abTopupTo" placeholder="Сумма до" style="width:110px;">
+        <input type="number" id="abTopupPercent" placeholder="% кэшбэка" style="width:100px;">
+        <button class="btn btn-primary" id="abTopupAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить</button>
       </div>
       <table class="admin-table">
-        <thead><tr><th>Событие</th><th>Награда</th></tr></thead>
-        <tbody id="abTableBody"><tr><td colspan="2" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
+        <thead><tr><th>Сумма от</th><th>Сумма до</th><th>% кэшбэка</th><th></th></tr></thead>
+        <tbody id="abTopupTableBody"><tr><td colspan="4" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
       </table>
     </section>
 

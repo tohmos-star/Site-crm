@@ -890,34 +890,72 @@ function initManualGroupsForm() {
   });
 }
 
+async function deleteAutoBonusRule(id) {
+  if (!confirm('Удалить правило автобонуса?')) return;
+  await adminFetch(`/api/loyalty/auto-bonus-rules/${id}`, { method: 'DELETE' });
+  loadAutoBonusRules();
+}
+
 async function loadAutoBonusRules() {
-  const tbody = document.getElementById('abTableBody');
+  const regBody = document.getElementById('abRegTableBody');
+  const topupBody = document.getElementById('abTopupTableBody');
   const res = await adminFetch('/api/loyalty/auto-bonus-rules');
   const rules = await res.json();
-  if (!rules.length) {
-    tbody.innerHTML = '<tr><td colspan="2" style="color:var(--text-muted);">Пусто</td></tr>';
-    return;
-  }
-  const triggerLabels = { REGISTRATION: 'Регистрация', TOPUP: 'Пополнение' };
-  tbody.innerHTML = rules.map(r => `
+
+  const regRules = rules.filter(r => r.trigger === 'REGISTRATION');
+  const topupRules = rules.filter(r => r.trigger === 'TOPUP');
+
+  regBody.innerHTML = regRules.length ? regRules.map(r => `
     <tr>
-      <td>${triggerLabels[r.trigger] || r.trigger}</td>
       <td>${r.rewardType === 'PERCENT' ? r.rewardValue + '%' : r.rewardValue + ' ₽'}</td>
+      <td><div class="row-actions"><button class="btn btn-ghost" data-delete-bonus="${r.id}">Удалить</button></div></td>
     </tr>
-  `).join('');
+  `).join('') : '<tr><td colspan="2" style="color:var(--text-muted);">Пусто</td></tr>';
+
+  topupBody.innerHTML = topupRules.length ? topupRules.map(r => `
+    <tr>
+      <td>${r.minAmount ?? '—'}</td>
+      <td>${r.maxAmount ?? '—'}</td>
+      <td>${r.rewardType === 'PERCENT' ? r.rewardValue + '%' : r.rewardValue + ' ₽'}</td>
+      <td><div class="row-actions"><button class="btn btn-ghost" data-delete-bonus="${r.id}">Удалить</button></div></td>
+    </tr>
+  `).join('') : '<tr><td colspan="4" style="color:var(--text-muted);">Пусто</td></tr>';
+
+  [regBody, topupBody].forEach(tbody => {
+    tbody.querySelectorAll('[data-delete-bonus]').forEach(btn => {
+      btn.addEventListener('click', () => deleteAutoBonusRule(btn.dataset.deleteBonus));
+    });
+  });
 }
 
 function initAutoBonusForm() {
-  document.getElementById('abAddSubmit').addEventListener('click', async () => {
-    const trigger = document.getElementById('abNewTrigger').value;
-    const rewardType = document.getElementById('abNewRewardType').value;
-    const rewardValue = Number(document.getElementById('abNewRewardValue').value);
+  document.getElementById('abRegAddSubmit').addEventListener('click', async () => {
+    const rewardType = document.getElementById('abRegRewardType').value;
+    const rewardValue = Number(document.getElementById('abRegRewardValue').value);
     if (!rewardValue) return;
     await adminFetch('/api/loyalty/auto-bonus-rules', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clubId: CLUB_ID, trigger, rewardType, rewardValue }),
+      body: JSON.stringify({ clubId: CLUB_ID, trigger: 'REGISTRATION', rewardType, rewardValue }),
     });
-    document.getElementById('abNewRewardValue').value = '';
+    document.getElementById('abRegRewardValue').value = '';
+    loadAutoBonusRules();
+  });
+
+  document.getElementById('abTopupAddSubmit').addEventListener('click', async () => {
+    const minAmount = Number(document.getElementById('abTopupFrom').value);
+    const maxAmount = Number(document.getElementById('abTopupTo').value);
+    const rewardValue = Number(document.getElementById('abTopupPercent').value);
+    if (!minAmount || !maxAmount || !rewardValue) return;
+    await adminFetch('/api/loyalty/auto-bonus-rules', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clubId: CLUB_ID, trigger: 'TOPUP', rewardType: 'PERCENT', rewardValue,
+        minAmount, maxAmount,
+      }),
+    });
+    document.getElementById('abTopupFrom').value = '';
+    document.getElementById('abTopupTo').value = '';
+    document.getElementById('abTopupPercent').value = '';
     loadAutoBonusRules();
   });
 }
