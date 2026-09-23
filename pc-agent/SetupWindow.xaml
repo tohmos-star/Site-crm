@@ -1,0 +1,32 @@
+<Window x:Class="PcAgent.SetupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="404 · настройка станции"
+        Height="300" Width="380"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="#10141B">
+    <StackPanel Margin="28" VerticalAlignment="Center">
+        <TextBlock Text="404 · настройка станции"
+                   Foreground="#E7ECF3" FontSize="15" FontWeight="Bold"
+                   HorizontalAlignment="Center" Margin="0,0,0,4"/>
+        <TextBlock Text="Введите токен станции, выданный админом в разделе «Устройства»"
+                   Foreground="#8592A3" FontSize="12" TextWrapping="Wrap"
+                   TextAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,18"/>
+        <TextBox x:Name="TokenInput"
+                 FontFamily="Consolas" FontSize="18" Padding="10"
+                 Background="#212B38" Foreground="#E7ECF3" BorderBrush="#2A3441"
+                 CharacterCasing="Upper" MaxLength="9"
+                 HorizontalContentAlignment="Center"
+                 TextChanged="TokenInput_TextChanged"/>
+        <TextBlock x:Name="ErrorText"
+                   Foreground="#F0555A" FontSize="12" Margin="0,10,0,0"
+                   TextWrapping="Wrap" TextAlignment="Center" Visibility="Collapsed"/>
+        <Button x:Name="SaveButton"
+                Content="Сохранить"
+                Margin="0,14,0,0" Padding="0,11"
+                Background="#212B38" Foreground="#8592A3" BorderThickness="0"
+                IsEnabled="False"
+                Click="SaveButton_Click"/>
+    </StackPanel>
+</Window>
