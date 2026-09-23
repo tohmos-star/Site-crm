@@ -45,8 +45,19 @@ export class DeviceService {
   }
 
   async create(body: DeviceBody) {
-    const device = await this.prisma.device.create({ data: body });
+    const cardNumber = body.cardNumber ?? (await this.nextCardNumber(body.clubId));
+    const device = await this.prisma.device.create({ data: { ...body, cardNumber } });
     return this.stripToken(device);
+  }
+
+  // Номер карточки больше не вводится вручную в форме — берём следующий
+  // свободный в рамках клуба (уникальность — @@unique([clubId, cardNumber])).
+  private async nextCardNumber(clubId: string) {
+    const result = await this.prisma.device.aggregate({
+      where: { clubId },
+      _max: { cardNumber: true },
+    });
+    return (result._max.cardNumber ?? 0) + 1;
   }
 
   async update(id: string, body: Partial<DeviceBody>) {

@@ -21,7 +21,10 @@ export const DeviceBody = Type.Object({
   zoneId: Type.String(),
   kind: Type.Optional(DeviceKind),
   name: Type.String({ minLength: 1 }),
-  cardNumber: Type.Integer(),
+  // Больше не вводится вручную в форме создания — при отсутствии
+  // назначается автоматически (см. DeviceService.create): следующий
+  // свободный номер в рамках клуба.
+  cardNumber: Type.Optional(Type.Integer()),
   physicalName: Type.Optional(Type.String()),
   mac: Type.Optional(Type.String()),
   ip: Type.Optional(Type.String()),

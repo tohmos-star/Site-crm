@@ -505,10 +505,8 @@ async function loadDevices() {
   const tbody = document.getElementById('dTableBody');
   tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);">Загрузка…</td></tr>';
   const zoneId = document.getElementById('dZoneFilter').value;
-  const status = document.getElementById('dStatusFilter').value;
   const params = new URLSearchParams();
   if (zoneId) params.set('zoneId', zoneId);
-  if (status) params.set('status', status);
 
   try {
     const res = await adminFetch(`/api/devices?${params.toString()}`);
@@ -604,7 +602,6 @@ async function loadDevices() {
 function initDevicesTab() {
   document.getElementById('dRefresh').addEventListener('click', loadDevices);
   document.getElementById('dZoneFilter').addEventListener('change', loadDevices);
-  document.getElementById('dStatusFilter').addEventListener('change', loadDevices);
 
   const addForm = document.getElementById('dAddForm');
   document.getElementById('dAddBtn').addEventListener('click', () => {
@@ -614,17 +611,14 @@ function initDevicesTab() {
   document.getElementById('dAddSubmit').addEventListener('click', async () => {
     const zoneId = document.getElementById('dNewZone').value;
     const name = document.getElementById('dNewName').value.trim();
-    const cardNumber = Number(document.getElementById('dNewCard').value);
-    const kind = document.getElementById('dNewKind').value;
     const mac = document.getElementById('dNewMac').value.trim();
-    if (!zoneId || !name || !cardNumber) return;
+    if (!zoneId || !name) return;
 
     await adminFetch('/api/devices', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clubId: CLUB_ID, zoneId, name, cardNumber, kind, mac: mac || undefined }),
+      body: JSON.stringify({ clubId: CLUB_ID, zoneId, name, mac: mac || undefined }),
     });
     document.getElementById('dNewName').value = '';
-    document.getElementById('dNewCard').value = '';
     document.getElementById('dNewMac').value = '';
     addForm.style.display = 'none';
     loadDevices();

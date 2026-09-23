@@ -156,30 +156,12 @@
     <section class="tab-panel" id="tab-devices">
       <div class="filter-row">
         <select id="dZoneFilter"><option value="">Все зоны</option></select>
-        <select id="dStatusFilter">
-          <option value="">Все статусы</option>
-          <option value="FREE">Свободно</option>
-          <option value="BUSY">Занято</option>
-          <option value="CONNECTING">Подключение</option>
-          <option value="TECH_MODE">Тех.режим</option>
-          <option value="LOCKED">Заблокировано</option>
-          <option value="DISABLED">Отключено</option>
-        </select>
         <button class="btn btn-ghost" id="dRefresh" style="padding:8px 14px; font-size:13px;">Обновить</button>
         <button class="btn btn-primary" id="dAddBtn" style="padding:8px 14px; font-size:13px;">+ Добавить устройство</button>
       </div>
       <div id="dAddForm" class="form-panel" style="max-width:480px; margin-bottom:16px; display:none;">
         <div class="field"><label>Зона</label><select id="dNewZone"></select></div>
         <div class="field"><label>Название</label><input type="text" id="dNewName" placeholder="DUO 1 · место 1"></div>
-        <div class="field"><label>№ карточки</label><input type="number" id="dNewCard" placeholder="1"></div>
-        <div class="field"><label>Тип</label>
-          <select id="dNewKind">
-            <option value="PC">PC</option>
-            <option value="TV">TV</option>
-            <option value="TERMINAL">Терминал</option>
-            <option value="ADMIN_PC">Админский ПК</option>
-          </select>
-        </div>
         <div class="field"><label>MAC-адрес (для Wake-on-LAN, необязательно)</label><input type="text" id="dNewMac" placeholder="AA:BB:CC:DD:EE:FF"></div>
         <button class="btn btn-primary" id="dAddSubmit" style="width:100%; justify-content:center;">Создать</button>
       </div>
