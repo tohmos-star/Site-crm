@@ -17,10 +17,12 @@
 <div id="pcwRoot"></div>
 <script>
 (function () {
-  // Цвета — из frontend/css/main.css :root, чтобы оверлей на станции не расходился с сайтом.
-  const BG = '#0B0C0E', SURFACE = '#151619', SURFACE_ALT = '#1B1D21', BORDER = '#232529';
-  const TEXT = '#F2F1ED', TEXT_MUTED = '#8B8D93';
-  const ACCENT = '#FF5A1F', OK = '#4ADE9C', WARN = '#F2C94C';
+  // Палитра оверлея станции — отдельная от основного бренда сайта (см.
+  // референс-макеты виджета), мятно-зелёный вместо оранжевого как основной
+  // акцент, янтарный/красный для предупреждений и ошибок.
+  const BG = '#10141B', SURFACE = '#1A212B', SURFACE_ALT = '#212B38', BORDER = '#2A3441';
+  const TEXT = '#E7ECF3', TEXT_MUTED = '#8592A3';
+  const MINT = '#3ED598', AMBER = '#F2A93B', RED = '#F0555A';
   const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
   const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
   const MINUTE_STEP = 10;
@@ -243,8 +245,8 @@
             <div style="flex:1;text-align:center;"><div style="font-family:${MONO};font-size:18px;font-weight:600;">${extendMinutes} мин</div><div style="font-family:${MONO};font-size:11.5px;color:${TEXT_MUTED};">${price} ₽</div></div>
             <button data-action="step" data-dir="1" style="${btn(SURFACE_ALT, TEXT, 'width:36px;')}">+</button>
           </div>
-          <button data-action="buyMinutes" ${(affordable && !extendPending) ? '' : 'disabled'} style="width:100%;margin-top:10px;${btn(affordable ? ACCENT : SURFACE_ALT, affordable ? '#0B1D14' : TEXT_MUTED)}">${extendPending ? 'Продлеваем…' : `Продлить на ${extendMinutes} мин`}</button>
-          ${extendError ? `<div style="color:${ACCENT};font-size:12px;margin-top:8px;">${extendError}</div>` : ''}
+          <button data-action="buyMinutes" ${(affordable && !extendPending) ? '' : 'disabled'} style="width:100%;margin-top:10px;${btn(affordable ? MINT : SURFACE_ALT, affordable ? '#0B1D14' : TEXT_MUTED)}">${extendPending ? 'Продлеваем…' : `Продлить на ${extendMinutes} мин`}</button>
+          ${extendError ? `<div style="color:${RED};font-size:12px;margin-top:8px;">${extendError}</div>` : ''}
         </div>`);
     }
     if (modal === 'end') {
@@ -253,32 +255,32 @@
           <div style="font-size:34px;">▦</div>
           <div style="font-size:15px;font-weight:600;">Подтвердите чистоту рабочего места</div>
           <div style="font-size:13px;color:${TEXT_MUTED};">Заполните короткий чек-лист и приложите 2 фото места — сессия завершится после отправки.</div>
-          <button data-action="goToReport" style="width:100%;${btn(ACCENT, '#0B1D14')}">Заполнить отчёт</button>
+          <button data-action="goToReport" style="width:100%;${btn(MINT, '#0B1D14')}">Заполнить отчёт</button>
         </div>`);
     }
     if (modal === 'reboot') {
       return modalWrap(`
         <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;">
-          <div style="font-size:32px;color:${WARN};">↻</div>
+          <div style="font-size:32px;color:${AMBER};">↻</div>
           <div style="font-size:15px;font-weight:600;">Перезагрузить ПК?</div>
           <div style="font-size:13px;color:${TEXT_MUTED};">Сессия не прервётся, оплаченное время продолжит отсчитываться.</div>
           <div style="display:flex;gap:8px;width:100%;">
             <button data-action="close" style="flex:1;${btn(SURFACE_ALT)}">Отмена</button>
-            <button data-action="confirmReboot" style="flex:1;${btn(WARN, '#1A1206')}">Перезагрузить</button>
+            <button data-action="confirmReboot" style="flex:1;${btn(AMBER, '#1A1206')}">Перезагрузить</button>
           </div>
         </div>`);
     }
     if (modal === 'support') {
-      const reasons = SUPPORT_REASONS.map(r => `<button data-action="setReason" data-reason="${r}" style="width:100%;text-align:left;padding:10px 12px;border-radius:8px;border:1px solid ${supportReason === r ? ACCENT : BORDER};background:${supportReason === r ? SURFACE_ALT : 'transparent'};color:${TEXT};cursor:pointer;">${r}</button>`).join('');
+      const reasons = SUPPORT_REASONS.map(r => `<button data-action="setReason" data-reason="${r}" style="width:100%;text-align:left;padding:10px 12px;border-radius:8px;border:1px solid ${supportReason === r ? MINT : BORDER};background:${supportReason === r ? SURFACE_ALT : 'transparent'};color:${TEXT};cursor:pointer;">${r}</button>`).join('');
       return modalWrap(`
         <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;">
           <div style="font-size:32px;">🛟</div>
           <div style="font-size:15px;font-weight:600;">Тех.поддержка</div>
           <div style="font-size:12.5px;color:${TEXT_MUTED};margin-top:-4px;">90% проблем решаются перезагрузкой ПК</div>
-          ${supportSent ? `<div style="color:${OK};font-size:13px;">✓ Заявка отправлена, администратор уведомлён</div>` : `
+          ${supportSent ? `<div style="color:${MINT};font-size:13px;">✓ Заявка отправлена, администратор уведомлён</div>` : `
           <div style="width:100%;text-align:left;"><div style="font-size:12px;color:${TEXT_MUTED};margin-bottom:6px;">Тема</div><div style="display:flex;flex-direction:column;gap:6px;">${reasons}</div></div>
           <div style="width:100%;text-align:left;"><div style="font-size:12px;color:${TEXT_MUTED};margin:10px 0 6px;">Сообщение</div><textarea data-action="supportMessage" rows="3" placeholder="Опишите проблему подробнее (необязательно)" style="width:100%;resize:none;background:${SURFACE_ALT};border:1px solid ${BORDER};border-radius:8px;color:${TEXT};font-size:13px;padding:10px;box-sizing:border-box;font-family:${SANS};"></textarea></div>
-          <button data-action="sendSupport" ${supportReason ? '' : 'disabled'} style="width:100%;${btn(supportReason ? ACCENT : SURFACE_ALT, supportReason ? '#0B1D14' : TEXT_MUTED)}">Отправить</button>`}
+          <button data-action="sendSupport" ${supportReason ? '' : 'disabled'} style="width:100%;${btn(supportReason ? MINT : SURFACE_ALT, supportReason ? '#0B1D14' : TEXT_MUTED)}">Отправить</button>`}
         </div>`);
     }
     if (modal === 'topup') {
@@ -297,7 +299,7 @@
           <div style="border-top:1px solid ${BORDER};padding-top:10px;">
             <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;"><input type="checkbox" data-action="toggleReceipt" ${topupWantsReceipt ? 'checked' : ''}> Получить электронный чек на почту</label>
           </div>
-          <button data-action="generateQr" ${(amount && topupWantsReceipt) ? '' : 'disabled'} style="width:100%;${btn((amount && topupWantsReceipt) ? ACCENT : SURFACE_ALT, (amount && topupWantsReceipt) ? '#0B1D14' : TEXT_MUTED)}">Оплатить</button>`;
+          <button data-action="generateQr" ${(amount && topupWantsReceipt) ? '' : 'disabled'} style="width:100%;${btn((amount && topupWantsReceipt) ? MINT : SURFACE_ALT, (amount && topupWantsReceipt) ? '#0B1D14' : TEXT_MUTED)}">Оплатить</button>`;
       } else if (topupStage === 'waiting') {
         body = `
           <div style="width:148px;height:148px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;margin:4px auto;font-size:60px;">▦</div>
@@ -305,7 +307,7 @@
           <div style="font-size:12.5px;color:${TEXT_MUTED};">Ждём оплату…</div>
           <button data-action="forceConfirm" style="width:100%;${btn(SURFACE_ALT, TEXT_MUTED, 'font-size:12px;')}">Демо: платёж пришёл</button>`;
       } else {
-        body = `<div style="color:${OK};font-size:14px;padding:10px 0;">✓ Баланс пополнен на ${topupAmount} ₽ (демо)</div>`;
+        body = `<div style="color:${MINT};font-size:14px;padding:10px 0;">✓ Баланс пополнен на ${topupAmount} ₽ (демо)</div>`;
       }
       return modalWrap(`<div style="text-align:center;display:flex;flex-direction:column;gap:10px;">${body}</div>`);
     }
@@ -321,8 +323,8 @@
           <div style="font-size:12px;color:${TEXT_MUTED};margin-bottom:18px;">Вставьте токен устройства, выданный админом в разделе «Устройства»</div>
           <input id="pcwSetupInput" value="${setupInput}" placeholder="agentToken" autocomplete="off"
             style="width:100%;text-align:center;background:${SURFACE_ALT};border:1px solid ${BORDER};border-radius:10px;color:${TEXT};font-family:${MONO};font-size:13px;padding:12px 10px;box-sizing:border-box;">
-          ${setupError ? `<div style="color:${ACCENT};font-size:12px;margin-top:10px;">${setupError}</div>` : ''}
-          <button data-action="saveSetup" ${(setupInput.trim() && !setupSaving) ? '' : 'disabled'} style="width:100%;margin-top:14px;${btn(setupInput.trim() ? ACCENT : SURFACE_ALT, setupInput.trim() ? '#0B1D14' : TEXT_MUTED)}">${setupSaving ? 'Проверяем…' : 'Сохранить'}</button>
+          ${setupError ? `<div style="color:${RED};font-size:12px;margin-top:10px;">${setupError}</div>` : ''}
+          <button data-action="saveSetup" ${(setupInput.trim() && !setupSaving) ? '' : 'disabled'} style="width:100%;margin-top:14px;${btn(setupInput.trim() ? MINT : SURFACE_ALT, setupInput.trim() ? '#0B1D14' : TEXT_MUTED)}">${setupSaving ? 'Проверяем…' : 'Сохранить'}</button>
         </div>
       </div>`;
     const input = document.getElementById('pcwSetupInput');
@@ -350,8 +352,8 @@
             <div style="font-size:12px;color:${TEXT_MUTED};margin-bottom:18px;">Введите код брони</div>
             <input id="pcwCodeInput" value="${codeInput}" placeholder="000000" maxlength="6" inputmode="numeric"
               style="width:100%;text-align:center;background:${SURFACE_ALT};border:1px solid ${BORDER};border-radius:10px;color:${TEXT};font-family:${MONO};font-size:28px;letter-spacing:0.15em;padding:12px 0;box-sizing:border-box;">
-            ${codeError ? `<div style="color:${ACCENT};font-size:12px;margin-top:10px;">${codeError}</div>` : ''}
-            <button data-action="submitCode" ${(codeInput.length === 6 && !redeeming) ? '' : 'disabled'} style="width:100%;margin-top:14px;${btn(codeInput.length === 6 ? ACCENT : SURFACE_ALT, codeInput.length === 6 ? '#0B1D14' : TEXT_MUTED)}">${redeeming ? 'Проверяем…' : 'Подтвердить'}</button>
+            ${codeError ? `<div style="color:${RED};font-size:12px;margin-top:10px;">${codeError}</div>` : ''}
+            <button data-action="submitCode" ${(codeInput.length === 6 && !redeeming) ? '' : 'disabled'} style="width:100%;margin-top:14px;${btn(codeInput.length === 6 ? MINT : SURFACE_ALT, codeInput.length === 6 ? '#0B1D14' : TEXT_MUTED)}">${redeeming ? 'Проверяем…' : 'Подтвердить'}</button>
             <div style="font-size:11px;color:${TEXT_MUTED};margin-top:12px;">Код — в личном кабинете после бронирования на вкладке «Сайт»</div>
             <button data-action="openSetup" style="width:100%;margin-top:10px;background:transparent;border:none;color:${TEXT_MUTED};font-size:11px;cursor:pointer;text-decoration:underline;">Сменить токен станции</button>
           </div>
@@ -373,16 +375,16 @@
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <div style="font-size:13px;font-weight:600;color:${TEXT};">404 · ${stationLabel}</div>
               <div style="display:flex;align-items:center;gap:10px;">
-                <div style="font-size:11.5px;color:${OK};">📶 онлайн</div>
+                <div style="font-size:11.5px;color:${MINT};">📶 онлайн</div>
                 <button data-action="minimize" style="background:transparent;border:none;color:${TEXT_MUTED};cursor:pointer;">−</button>
               </div>
             </div>
             <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;">
               <div style="font-size:12.5px;color:${TEXT_MUTED};font-family:${MONO};">Баланс: <span style="color:${TEXT};">${balance} ₽</span></div>
-              <button data-action="open" data-modal="topup" style="display:flex;align-items:center;gap:4px;padding:4px 9px;border-radius:999px;border:1px solid ${ACCENT};background:transparent;color:${ACCENT};font-size:11.5px;cursor:pointer;">+ Пополнить</button>
+              <button data-action="open" data-modal="topup" style="display:flex;align-items:center;gap:4px;padding:4px 9px;border-radius:999px;border:1px solid ${MINT};background:transparent;color:${MINT};font-size:11.5px;cursor:pointer;">+ Пополнить</button>
             </div>
             <div style="text-align:center;margin:14px 0 6px;">
-              <div style="font-family:${MONO};font-size:34px;font-weight:600;color:${sessionEnded ? TEXT_MUTED : rebooting ? ACCENT : remainingMs < 5 * 60000 ? WARN : OK};">${sessionEnded ? '--:--' : fmtClock(remainingMs)}</div>
+              <div style="font-family:${MONO};font-size:34px;font-weight:600;color:${sessionEnded ? TEXT_MUTED : rebooting ? RED : remainingMs < 5 * 60000 ? AMBER : MINT};">${sessionEnded ? '--:--' : fmtClock(remainingMs)}</div>
               <div style="font-size:12px;color:${TEXT_MUTED};margin-top:2px;">${sessionEnded ? 'Сессия завершена' : rebooting ? 'Идёт перезагрузка…' : `оплачено до ${plannedEnd.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`}</div>
             </div>
             ${!sessionEnded ? `
@@ -399,7 +401,7 @@
             ${log.map((e, i) => `<div style="display:flex;gap:8px;padding:7px 11px;${i ? `border-top:1px solid ${BORDER};` : ''}font-size:11.5px;"><span style="font-family:${MONO};color:${TEXT_MUTED};flex-shrink:0;">${e.time}</span><span>${e.text}</span></div>`).join('')}
           </div>
         ` : `
-          <button data-action="minimize" style="width:34px;height:34px;border-radius:8px;border:1px solid ${BORDER};background:rgba(16,20,27,0.9);cursor:pointer;position:relative;">🖥️<span style="position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%;background:${OK};"></span></button>
+          <button data-action="minimize" style="width:34px;height:34px;border-radius:8px;border:1px solid ${BORDER};background:rgba(16,20,27,0.9);cursor:pointer;position:relative;">🖥️<span style="position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%;background:${MINT};"></span></button>
         `}
         </div>
         ${renderModal()}
