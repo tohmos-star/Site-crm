@@ -7,7 +7,11 @@ export const ZoneBody = Type.Object({
   color: Type.Optional(Type.String()),
   sortOrder: Type.Optional(Type.Integer()),
   isRoom: Type.Optional(Type.Boolean()),
-  defaultTariffId: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  // Null первым в union — иначе Ajv (coerceTypes: true) молча превращает
+  // null в "" при валидации, и сброс тарифа на "не выбран" падает с
+  // нарушением внешнего ключа вместо реального NULL (см. тот же фикс в
+  // loyalty/schemas.ts).
+  defaultTariffId: Type.Optional(Type.Union([Type.Null(), Type.String()])),
 });
 export type ZoneBody = Static<typeof ZoneBody>;
 

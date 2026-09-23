@@ -55,12 +55,16 @@ export type IdParams = Static<typeof IdParams>;
 export const GuestIdParams = Type.Object({ guestId: Type.String() });
 export type GuestIdParams = Static<typeof GuestIdParams>;
 
+// Порядок веток важен: Ajv (coerceTypes: true, дефолт Fastify) при null
+// на "anyOf: [string, null]" пытается сначала привести null к строке и
+// молча превращает его в "" — с null первым он валидируется как null
+// напрямую, без порчи значения (проверено вручную на бандленном ajv).
 export const SetManualGroupBody = Type.Object({
-  manualGroupId: Type.Union([Type.String(), Type.Null()]),
+  manualGroupId: Type.Union([Type.Null(), Type.String()]),
 });
 export type SetManualGroupBody = Static<typeof SetManualGroupBody>;
 
 export const SetTierBody = Type.Object({
-  tierId: Type.Union([Type.String(), Type.Null()]),
+  tierId: Type.Union([Type.Null(), Type.String()]),
 });
 export type SetTierBody = Static<typeof SetTierBody>;
