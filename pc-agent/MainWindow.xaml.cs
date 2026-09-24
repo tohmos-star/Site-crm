@@ -33,7 +33,16 @@ public partial class MainWindow : Window
         _deviceToken = deviceToken;
         _timer.Tick += Timer_Tick;
         _pollTimer.Tick += async (_, _) => await CheckSessionAsync();
-        Closed += (_, _) => HideLockScreen();
+        // Без явной остановки оба DispatcherTimer продолжают тикать и после
+        // Close() (например, после "Сменить токен станции") — окно закрыто,
+        // а фоновый опрос со старым токеном работает вхолостую бесконечно и
+        // при 401 может повторно вызвать ReturnToSetup на уже закрытом окне.
+        Closed += (_, _) =>
+        {
+            _timer.Stop();
+            _pollTimer.Stop();
+            HideLockScreen();
+        };
 
         if (_deviceToken is not null)
         {

@@ -44,7 +44,12 @@ public partial class LockScreenWindow : Window
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
-        if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Shift) && e.Key == Key.U)
+        // Пока зажат Alt, WPF маршрутизирует нажатие как "системное":
+        // e.Key приходит как Key.System, а настоящая клавиша лежит в
+        // e.SystemKey. Без этой проверки Ctrl+Alt+Shift+U никогда не
+        // сработает, и аварийный выход молча не работает.
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Shift) && key == Key.U)
         {
             EmergencyUnlockRequested?.Invoke(this, EventArgs.Empty);
         }
