@@ -68,6 +68,16 @@ function initTabs() {
       closeMenu();
     });
   });
+
+  // Подвкладки внутри "Тарифы" (Типы дней / Группы тарифов / Базовый тариф / Пакеты).
+  document.querySelectorAll('.subtab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.subtab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('subtab-' + btn.dataset.subtab).classList.add('active');
+    });
+  });
 }
 
 // ---------------------------------------------------------------------
