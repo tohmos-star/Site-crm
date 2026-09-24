@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { DomainError, NotFoundError } from "../../lib/errors.js";
 import { BalanceService } from "../balance/service.js";
@@ -90,23 +90,72 @@ export class TariffService {
   }
 
   listTariffs(groupId?: string) {
-    return this.prisma.tariff.findMany({ where: groupId ? { groupId } : undefined });
+    return this.prisma.tariff.findMany({
+      where: groupId ? { groupId } : undefined,
+      include: { allowedLoyaltyTiers: true },
+    });
   }
 
   async getTariff(id: string) {
-    const tariff = await this.prisma.tariff.findUnique({ where: { id } });
+    const tariff = await this.prisma.tariff.findUnique({
+      where: { id },
+      include: { allowedLoyaltyTiers: true },
+    });
     if (!tariff) throw new NotFoundError("Tariff", id);
     return tariff;
   }
 
-  createTariff(body: TariffBody) {
+  async createTariff(body: TariffBody) {
     this.assertTariffShape(body);
-    return this.prisma.tariff.create({ data: body });
+    const { allowedLoyaltyTierIds, ...rest } = body;
+    try {
+      return await this.prisma.tariff.create({
+        data: {
+          ...rest,
+          allowedLoyaltyTiers: allowedLoyaltyTierIds
+            ? { connect: allowedLoyaltyTierIds.map((tierId) => ({ id: tierId })) }
+            : undefined,
+        },
+        include: { allowedLoyaltyTiers: true },
+      });
+    } catch (err) {
+      throw this.mapLoyaltyTierConnectError(err);
+    }
   }
 
   async updateTariff(id: string, body: Partial<TariffBody>) {
     await this.getTariff(id);
-    return this.prisma.tariff.update({ where: { id }, data: body });
+    const { allowedLoyaltyTierIds, ...rest } = body;
+    try {
+      return await this.prisma.tariff.update({
+        where: { id },
+        data: {
+          ...rest,
+          // set (не connect) — полностью заменяет список выбранных уровней тем,
+          // что прислала форма (multi-select в админке шлёт весь набор целиком).
+          allowedLoyaltyTiers: allowedLoyaltyTierIds
+            ? { set: allowedLoyaltyTierIds.map((tierId) => ({ id: tierId })) }
+            : undefined,
+        },
+        include: { allowedLoyaltyTiers: true },
+      });
+    } catch (err) {
+      throw this.mapLoyaltyTierConnectError(err);
+    }
+  }
+
+  // connect/set на несуществующий id уровня лояльности (устаревший кэш в
+  // админке и т.п.) иначе падает необработанной P2025 → голый 500 без
+  // объяснения, что именно не так.
+  private mapLoyaltyTierConnectError(err: unknown): unknown {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+      return new DomainError(
+        "INVALID_LOYALTY_TIER",
+        "Один из выбранных уровней лояльности не найден — обновите страницу и попробуйте снова",
+        400,
+      );
+    }
+    return err;
   }
 
   private assertTariffShape(body: TariffBody) {

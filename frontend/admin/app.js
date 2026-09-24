@@ -923,11 +923,55 @@ function initTariffGroupsForm() {
   });
 }
 
+// "Пакет" на сервере — один type с двумя режимами (packageMode); админу
+// удобнее видеть их как два разных типа сразу в списке/форме.
+function tariffTypeLabel(t) {
+  if (t.type === 'PACKAGE') {
+    return t.packageMode === 'FIXED_END' ? 'Фикс. окончание' : 'Фикс. длительность';
+  }
+  return TARIFF_TYPE_LABELS[t.type] || t.type;
+}
+
 async function loadTariffs() {
-  const tbody = document.getElementById('tTableBody');
   const res = await adminFetch('/api/tariffs');
   TARIFFS_CACHE = await res.json();
+  renderTariffsTable();
+  renderBaseTariffPanel();
+}
 
+// "Базовый тариф" — отдельная подвкладка с фокусом на его ключевой настройке
+// (минимальное списание), реюзает общую модалку редактирования тарифа.
+function renderBaseTariffPanel() {
+  const container = document.getElementById('subtab-base');
+  const baseTariffs = TARIFFS_CACHE.filter(t => t.type === 'BASE');
+  if (!baseTariffs.length) {
+    container.innerHTML = '<p style="color:var(--text-muted); font-size:13px;">Пока нет ни одного базового тарифа — создайте его во вкладке «Группы тарифов» (тип «Базовый»).</p>';
+    return;
+  }
+  container.innerHTML = `
+    <table class="admin-table">
+      <thead><tr><th>Название</th><th>Минимальное списание, мин</th><th></th></tr></thead>
+      <tbody>
+        ${baseTariffs.map(t => `
+          <tr>
+            <td>${escapeHtml(t.name)}</td>
+            <td>${t.minChargedMinutes || 0}</td>
+            <td><button class="btn btn-ghost" data-edit-base-tariff="${t.id}">✎ Редактировать</button></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+  container.querySelectorAll('[data-edit-base-tariff]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!TIERS_CACHE.length) await loadLoyaltyTiers();
+      openTariffEditModal(btn.dataset.editBaseTariff);
+    });
+  });
+}
+
+function renderTariffsTable() {
+  const tbody = document.getElementById('tTableBody');
   if (!TARIFFS_CACHE.length) {
     tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted);">Пусто</td></tr>';
     return;
@@ -937,9 +981,14 @@ async function loadTariffs() {
     return `
       <tr>
         <td>${escapeHtml(group?.name || '—')}</td>
-        <td>${TARIFF_TYPE_LABELS[t.type] || t.type}</td>
+        <td>${tariffTypeLabel(t)}</td>
         <td>${escapeHtml(t.name)}</td>
-        <td><button class="btn btn-ghost" data-manage-rules="${t.id}" data-tariff-name="${escapeHtml(t.name)}">Правила цен</button></td>
+        <td>
+          <div class="row-actions">
+            <button class="btn btn-ghost" data-edit-tariff="${t.id}" title="Редактировать">✎</button>
+            <button class="btn btn-ghost" data-manage-rules="${t.id}" data-tariff-name="${escapeHtml(t.name)}">Правила цен</button>
+          </div>
+        </td>
       </tr>
     `;
   }).join('');
@@ -947,28 +996,89 @@ async function loadTariffs() {
   tbody.querySelectorAll('[data-manage-rules]').forEach(btn => {
     btn.addEventListener('click', () => openRulesPanel(btn.dataset.manageRules, btn.dataset.tariffName));
   });
+  tbody.querySelectorAll('[data-edit-tariff]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!TIERS_CACHE.length) await loadLoyaltyTiers();
+      openTariffEditModal(btn.dataset.editTariff);
+    });
+  });
+}
+
+let tariffEditingId = null;
+
+function openTariffEditModal(id) {
+  const t = TARIFFS_CACHE.find(x => x.id === id);
+  if (!t) return;
+  tariffEditingId = id;
+
+  document.getElementById('tEditName').value = t.name;
+
+  const isDuration = t.type === 'PACKAGE' && t.packageMode === 'FIXED_DURATION';
+  const isFixedEnd = t.type === 'PACKAGE' && t.packageMode === 'FIXED_END';
+  const isBase = t.type === 'BASE';
+  document.getElementById('tEditDurationWrap').style.display = isDuration ? '' : 'none';
+  document.getElementById('tEditFixedEndWrap').style.display = isFixedEnd ? '' : 'none';
+  document.getElementById('tEditMinChargedWrap').style.display = isBase ? '' : 'none';
+  if (isDuration) document.getElementById('tEditDuration').value = t.packageDurationMin || '';
+  if (isFixedEnd) document.getElementById('tEditFixedEnd').value = minutesToHHMM(t.packageFixedEndMin || 0);
+  if (isBase) document.getElementById('tEditMinCharged').value = t.minChargedMinutes || 0;
+
+  const bonusEnabled = (t.bonusSpendMaxPercent || 0) > 0;
+  document.getElementById('tEditBonusEnabled').checked = bonusEnabled;
+  document.getElementById('tEditBonusPercentWrap').style.display = bonusEnabled ? '' : 'none';
+  document.getElementById('tEditBonusPercent').value = t.bonusSpendMaxPercent || 0;
+
+  document.getElementById('tEditAppAvailable').checked = t.allowOnlineBooking !== false;
+
+  const selectedTierIds = new Set((t.allowedLoyaltyTiers || []).map(x => x.id));
+  document.getElementById('tEditTiers').innerHTML = TIERS_CACHE.map(tier =>
+    `<option value="${tier.id}" ${selectedTierIds.has(tier.id) ? 'selected' : ''}>${escapeHtml(tier.name)}</option>`
+  ).join('');
+
+  document.getElementById('tEditModalBackdrop').style.display = 'flex';
 }
 
 function initTariffsForm() {
-  document.getElementById('tNewType').addEventListener('change', (e) => {
-    document.getElementById('tNewPackageMinWrap').style.display = e.target.value === 'PACKAGE' ? '' : 'none';
-  });
+  const typeSelect = document.getElementById('tNewType');
+  function updateNewTariffFieldVisibility() {
+    const v = typeSelect.value;
+    document.getElementById('tNewPackageMinWrap').style.display = v === 'FIXED_DURATION' ? '' : 'none';
+    document.getElementById('tNewFixedEndWrap').style.display = v === 'FIXED_END' ? '' : 'none';
+    const subDisplay = v === 'SUBSCRIPTION' ? '' : 'none';
+    document.getElementById('tNewSubDurationWrap').style.display = subDisplay;
+    document.getElementById('tNewSubLifetimeWrap').style.display = subDisplay;
+    document.getElementById('tNewSubPriceWrap').style.display = subDisplay;
+  }
+  typeSelect.addEventListener('change', updateNewTariffFieldVisibility);
+  updateNewTariffFieldVisibility();
+
   document.getElementById('tAddSubmit').addEventListener('click', async () => {
     const groupId = document.getElementById('tNewGroup').value;
-    const type = document.getElementById('tNewType').value;
+    const uiType = typeSelect.value; // BASE | FIXED_DURATION | FIXED_END | SUBSCRIPTION
     const name = document.getElementById('tNewName').value.trim();
-    const packageDurationMin = Number(document.getElementById('tNewPackageMin').value) || undefined;
     if (!groupId || !name) return;
+
+    const body = { groupId, name };
+    if (uiType === 'BASE') {
+      body.type = 'BASE';
+    } else if (uiType === 'FIXED_DURATION') {
+      body.type = 'PACKAGE';
+      body.packageMode = 'FIXED_DURATION';
+      body.packageDurationMin = Number(document.getElementById('tNewPackageMin').value) || undefined;
+    } else if (uiType === 'FIXED_END') {
+      body.type = 'PACKAGE';
+      body.packageMode = 'FIXED_END';
+      body.packageFixedEndMin = hhmmToMinutes(document.getElementById('tNewFixedEnd').value);
+    } else if (uiType === 'SUBSCRIPTION') {
+      body.type = 'SUBSCRIPTION';
+      body.subscriptionDurationMin = Number(document.getElementById('tNewSubDuration').value) || undefined;
+      body.subscriptionLifetimeHrs = Number(document.getElementById('tNewSubLifetime').value) || undefined;
+      body.subscriptionPrice = Number(document.getElementById('tNewSubPrice').value) || undefined;
+    }
+
     const res = await adminFetch('/api/tariffs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        groupId, type, name,
-        // packageMode обязателен на сервере для PACKAGE (см. tariffs/service.ts)
-        // — форма поддерживает только фиксированную длительность, второй
-        // режим (FIXED_END) в этой форме пока не заведён.
-        packageMode: type === 'PACKAGE' ? 'FIXED_DURATION' : undefined,
-        packageDurationMin: type === 'PACKAGE' ? packageDurationMin : undefined,
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => null);
@@ -977,6 +1087,54 @@ function initTariffsForm() {
     }
     document.getElementById('tNewName').value = '';
     document.getElementById('tNewPackageMin').value = '';
+    document.getElementById('tNewFixedEnd').value = '10:00';
+    document.getElementById('tNewSubDuration').value = '';
+    document.getElementById('tNewSubLifetime').value = '';
+    document.getElementById('tNewSubPrice').value = '';
+    loadTariffs();
+  });
+
+  const editBackdrop = document.getElementById('tEditModalBackdrop');
+  document.getElementById('tEditModalClose').addEventListener('click', () => { editBackdrop.style.display = 'none'; });
+  editBackdrop.addEventListener('click', (e) => { if (e.target === editBackdrop) editBackdrop.style.display = 'none'; });
+  document.getElementById('tEditBonusEnabled').addEventListener('change', (e) => {
+    document.getElementById('tEditBonusPercentWrap').style.display = e.target.checked ? '' : 'none';
+  });
+
+  document.getElementById('tEditModalSave').addEventListener('click', async () => {
+    const t = TARIFFS_CACHE.find(x => x.id === tariffEditingId);
+    if (!t) return;
+    const name = document.getElementById('tEditName').value.trim();
+    if (!name) return;
+
+    const body = {
+      name,
+      allowedLoyaltyTierIds: Array.from(document.getElementById('tEditTiers').selectedOptions).map(o => o.value),
+      bonusSpendMaxPercent: document.getElementById('tEditBonusEnabled').checked
+        ? Number(document.getElementById('tEditBonusPercent').value) || 0
+        : 0,
+      allowOnlineBooking: document.getElementById('tEditAppAvailable').checked,
+    };
+    if (t.type === 'PACKAGE' && t.packageMode === 'FIXED_DURATION') {
+      body.packageDurationMin = Number(document.getElementById('tEditDuration').value) || undefined;
+    }
+    if (t.type === 'PACKAGE' && t.packageMode === 'FIXED_END') {
+      body.packageFixedEndMin = hhmmToMinutes(document.getElementById('tEditFixedEnd').value);
+    }
+    if (t.type === 'BASE') {
+      body.minChargedMinutes = Number(document.getElementById('tEditMinCharged').value) || 0;
+    }
+
+    const res = await adminFetch(`/api/tariffs/${tariffEditingId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      alert(data?.error || 'Не удалось сохранить тариф.');
+      return;
+    }
+    editBackdrop.style.display = 'none';
     loadTariffs();
   });
 }

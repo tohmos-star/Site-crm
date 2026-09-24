@@ -52,6 +52,8 @@ export const TariffBody = Type.Object({
   bonusSpendMaxPercent: Type.Optional(Type.Integer({ minimum: 0, maximum: 100 })),
   refundUnusedTime: Type.Optional(Type.Boolean()),
   minChargedMinutes: Type.Optional(Type.Integer({ minimum: 0 })),
+  // Пусто/не передано = без ограничения (доступен всем уровням лояльности).
+  allowedLoyaltyTierIds: Type.Optional(Type.Array(Type.String())),
   sortOrder: Type.Optional(Type.Integer()),
 });
 export type TariffBody = Static<typeof TariffBody>;

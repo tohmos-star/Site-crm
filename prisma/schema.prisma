@@ -213,6 +213,13 @@ model Tariff {
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
 
+  // Пусто = доступен всем уровням лояльности (без ограничения) — см. админку
+  // "Тарифы → Группы тарифов". ВАЖНО: пока это только хранение выбора
+  // админом — гостю тариф сейчас не выбирается вручную (бронь всегда берёт
+  // zone.defaultTariffId), так что ограничение ещё не на что enforcить.
+  // Понадобится, когда появится выбор тарифа гостем при бронировании.
+  allowedLoyaltyTiers LoyaltyTier[] @relation("TariffLoyaltyTierAccess")
+
   rules              TariffRule[]
   bookings           Booking[]
   sessions           Session[]
@@ -527,7 +534,8 @@ model LoyaltyTier {
   cashbackPercent Int    @default(0)
   sortOrder       Int    @default(0)
 
-  guestStates GuestLoyaltyState[]
+  guestStates    GuestLoyaltyState[]
+  allowedTariffs Tariff[]            @relation("TariffLoyaltyTierAccess")
 
   @@index([minHours, maxHours])
 }

@@ -273,21 +273,47 @@
         <h3 style="font-size:14px; margin:0 0 10px;">Тарифы</h3>
         <div class="filter-row" style="align-items:flex-end;">
           <div class="field" style="margin:0;"><label>Группа</label><select id="tNewGroup" style="width:160px;"></select></div>
-          <div class="field" style="margin:0;"><label>Тип</label>
-            <select id="tNewType" style="width:140px;">
-              <option value="BASE">Базовый</option>
-              <option value="PACKAGE">Пакет</option>
+          <div class="field" style="margin:0;"><label>Тип тарифа</label>
+            <select id="tNewType" style="width:190px;">
+              <option value="BASE">Базовый (почасовой)</option>
+              <option value="FIXED_DURATION">Фиксированная длительность</option>
+              <option value="FIXED_END">Фиксированное окончание</option>
               <option value="SUBSCRIPTION">Абонемент</option>
             </select>
           </div>
-          <div class="field" style="margin:0;"><label>Название</label><input type="text" id="tNewName" placeholder="Почасовой" style="width:180px;"></div>
-          <div class="field" style="margin:0;" id="tNewPackageMinWrap"><label>Длительность пакета, мин</label><input type="number" id="tNewPackageMin" placeholder="180" style="width:120px;"></div>
+          <div class="field" style="margin:0;"><label>Название</label><input type="text" id="tNewName" placeholder="Ночной" style="width:180px;"></div>
+          <div class="field" style="margin:0;" id="tNewPackageMinWrap"><label>Длительность, мин</label><input type="number" id="tNewPackageMin" placeholder="180" style="width:120px;"></div>
+          <div class="field" style="margin:0;" id="tNewFixedEndWrap"><label>Время окончания</label><input type="time" id="tNewFixedEnd" value="10:00" style="width:120px;"></div>
+          <div class="field" style="margin:0;" id="tNewSubDurationWrap"><label>Время абонемента, мин</label><input type="number" id="tNewSubDuration" placeholder="1200" style="width:120px;"></div>
+          <div class="field" style="margin:0;" id="tNewSubLifetimeWrap"><label>Срок действия, ч</label><input type="number" id="tNewSubLifetime" placeholder="720" style="width:100px;"></div>
+          <div class="field" style="margin:0;" id="tNewSubPriceWrap"><label>Цена, ₽</label><input type="number" id="tNewSubPrice" placeholder="5000" style="width:100px;"></div>
           <button class="btn btn-primary" id="tAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить</button>
         </div>
         <table class="admin-table" style="margin-bottom:16px;">
           <thead><tr><th>Группа</th><th>Тип</th><th>Название</th><th>Действия</th></tr></thead>
           <tbody id="tTableBody"><tr><td colspan="4" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
         </table>
+
+        <div class="modal-backdrop" id="tEditModalBackdrop" style="display:none;">
+          <div class="modal-box">
+            <div class="modal-head">
+              <h3>Изменить тариф</h3>
+              <button type="button" class="modal-close" id="tEditModalClose">&times;</button>
+            </div>
+            <div class="field"><label>Название</label><input type="text" id="tEditName"></div>
+            <div class="field" id="tEditDurationWrap" style="display:none;"><label>Длительность, мин</label><input type="number" id="tEditDuration"></div>
+            <div class="field" id="tEditFixedEndWrap" style="display:none;"><label>Время окончания</label><input type="time" id="tEditFixedEnd"></div>
+            <div class="field" id="tEditMinChargedWrap" style="display:none;"><label>Минимальное списание, мин</label><input type="number" id="tEditMinCharged"></div>
+            <div class="field">
+              <label>Группы пользователей (никто не выбран = доступен всем)</label>
+              <select id="tEditTiers" multiple size="5" style="width:100%; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:6px;"></select>
+            </div>
+            <div class="field"><label><input type="checkbox" id="tEditBonusEnabled" style="width:auto;"> Можно списывать бонусы</label></div>
+            <div class="field" id="tEditBonusPercentWrap" style="display:none;"><label>Максимальный % оплаты бонусами</label><input type="number" id="tEditBonusPercent" min="0" max="100"></div>
+            <div class="field"><label><input type="checkbox" id="tEditAppAvailable" style="width:auto;"> Доступен в мобильном приложении</label></div>
+            <button class="btn btn-primary" id="tEditModalSave" style="width:100%; justify-content:center;">Сохранить</button>
+          </div>
+        </div>
 
         <div id="trPanel" style="display:none;">
           <h3 style="font-size:14px; margin:0 0 10px;">Правила цен — <span id="trTariffName"></span></h3>
@@ -306,10 +332,12 @@
         </div>
       </div>
 
-      <!-- Базовый тариф и Пакеты: ждут скриншота нужного экрана — см. чат. -->
+      <!-- Базовый тариф: список BASE-тарифов с фокусом на минимальном
+           списании, реюзает общую модалку редактирования (см. renderBaseTariffPanel). -->
       <div class="subtab-panel" id="subtab-base">
-        <p style="color:var(--text-muted); font-size:13px;">Настройка почасового тарифа появится здесь — пришлите скриншот нужного экрана.</p>
+        <p style="color:var(--text-muted); font-size:13px;">Загрузка…</p>
       </div>
+      <!-- Пакеты: ждёт скриншота нужного экрана — см. чат. -->
       <div class="subtab-panel" id="subtab-packages">
         <p style="color:var(--text-muted); font-size:13px;">Настройка пакетов появится здесь — пришлите скриншот нужного экрана.</p>
       </div>
