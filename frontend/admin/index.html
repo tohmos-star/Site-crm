@@ -293,33 +293,43 @@
           <thead><tr><th>Группа</th><th>Тип</th><th>Название</th><th>Действия</th></tr></thead>
           <tbody id="tTableBody"><tr><td colspan="4" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
         </table>
-
-        <div class="modal-backdrop" id="tEditModalBackdrop" style="display:none;">
-          <div class="modal-box">
-            <div class="modal-head">
-              <h3>Изменить тариф</h3>
-              <button type="button" class="modal-close" id="tEditModalClose">&times;</button>
-            </div>
-            <div class="field"><label>Название</label><input type="text" id="tEditName"></div>
-            <div class="field" id="tEditDurationWrap" style="display:none;"><label>Длительность, мин</label><input type="number" id="tEditDuration"></div>
-            <div class="field" id="tEditFixedEndWrap" style="display:none;"><label>Время окончания</label><input type="time" id="tEditFixedEnd"></div>
-            <div class="field" id="tEditMinChargedWrap" style="display:none;"><label>Минимальное списание, мин</label><input type="number" id="tEditMinCharged"></div>
-            <div class="field">
-              <label>Группы пользователей (никто не выбран = доступен всем)</label>
-              <select id="tEditTiers" multiple size="5" style="width:100%; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:6px;"></select>
-            </div>
-            <div class="field"><label><input type="checkbox" id="tEditBonusEnabled" style="width:auto;"> Можно списывать бонусы</label></div>
-            <div class="field" id="tEditBonusPercentWrap" style="display:none;"><label>Максимальный % оплаты бонусами</label><input type="number" id="tEditBonusPercent" min="0" max="100"></div>
-            <div class="field"><label><input type="checkbox" id="tEditAppAvailable" style="width:auto;"> Доступен в мобильном приложении</label></div>
-            <button class="btn btn-primary" id="tEditModalSave" style="width:100%; justify-content:center;">Сохранить</button>
-          </div>
-        </div>
       </div>
 
       <!-- Базовый тариф: список BASE-тарифов с фокусом на минимальном
            списании, реюзает общую модалку редактирования (см. renderBaseTariffPanel). -->
       <div class="subtab-panel" id="subtab-base">
         <p style="color:var(--text-muted); font-size:13px;">Загрузка…</p>
+      </div>
+
+      <!-- Модалка редактирования тарифа — общая для "Группы тарифов" и
+           "Базовый тариф"; вынесена сюда (не внутрь subtab-groups), иначе
+           открытая из "Базовый тариф" она была бы невидима из-за
+           display:none у неактивной родительской подвкладки. -->
+      <div class="modal-backdrop" id="tEditModalBackdrop" style="display:none;">
+        <div class="modal-box">
+          <div class="modal-head">
+            <h3>Изменить тариф</h3>
+            <button type="button" class="modal-close" id="tEditModalClose">&times;</button>
+          </div>
+          <div class="field"><label>Название</label><input type="text" id="tEditName"></div>
+          <div class="field" id="tEditDurationWrap" style="display:none;"><label>Длительность, мин</label><input type="number" id="tEditDuration"></div>
+          <div class="field" id="tEditFixedEndWrap" style="display:none;"><label>Время окончания</label><input type="time" id="tEditFixedEnd"></div>
+          <div class="field" id="tEditMinChargedWrap" style="display:none;"><label>Минимальное списание, мин</label><input type="number" id="tEditMinCharged"></div>
+          <div class="field" id="tEditSubDurationWrap" style="display:none;"><label>Время абонемента, мин</label><input type="number" id="tEditSubDuration"></div>
+          <div class="field" id="tEditSubLifetimeWrap" style="display:none;"><label>Срок действия, ч</label><input type="number" id="tEditSubLifetime"></div>
+          <div class="field" id="tEditSubPriceWrap" style="display:none;"><label>Цена, ₽</label><input type="number" id="tEditSubPrice"></div>
+          <div class="field">
+            <label>Группы пользователей (никто не выбран = доступен всем)</label>
+            <select id="tEditTiers" multiple size="5" style="width:100%; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:6px;"></select>
+          </div>
+          <div class="field"><label><input type="checkbox" id="tEditBonusEnabled" style="width:auto;"> Можно списывать бонусы</label></div>
+          <div class="field" id="tEditBonusPercentWrap" style="display:none;"><label>Максимальный % оплаты бонусами</label><input type="number" id="tEditBonusPercent" min="0" max="100"></div>
+          <div class="field"><label><input type="checkbox" id="tEditAppAvailable" style="width:auto;"> Доступен в мобильном приложении</label></div>
+          <div class="row-actions" style="margin-top:8px;">
+            <button class="btn btn-primary" id="tEditModalSave" style="flex:1; justify-content:center;">Сохранить</button>
+            <button class="btn btn-ghost" id="tEditModalDelete" style="color:var(--accent);">Удалить</button>
+          </div>
+        </div>
       </div>
 
       <!-- Пакеты: выбор PACKAGE-тарифа (заведён во "Группы тарифов") открывает

@@ -1036,12 +1036,21 @@ function openTariffEditModal(id) {
   const isDuration = t.type === 'PACKAGE' && t.packageMode === 'FIXED_DURATION';
   const isFixedEnd = t.type === 'PACKAGE' && t.packageMode === 'FIXED_END';
   const isBase = t.type === 'BASE';
+  const isSubscription = t.type === 'SUBSCRIPTION';
   document.getElementById('tEditDurationWrap').style.display = isDuration ? '' : 'none';
   document.getElementById('tEditFixedEndWrap').style.display = isFixedEnd ? '' : 'none';
   document.getElementById('tEditMinChargedWrap').style.display = isBase ? '' : 'none';
+  document.getElementById('tEditSubDurationWrap').style.display = isSubscription ? '' : 'none';
+  document.getElementById('tEditSubLifetimeWrap').style.display = isSubscription ? '' : 'none';
+  document.getElementById('tEditSubPriceWrap').style.display = isSubscription ? '' : 'none';
   if (isDuration) document.getElementById('tEditDuration').value = t.packageDurationMin || '';
   if (isFixedEnd) document.getElementById('tEditFixedEnd').value = minutesToHHMM(t.packageFixedEndMin || 0);
   if (isBase) document.getElementById('tEditMinCharged').value = t.minChargedMinutes || 0;
+  if (isSubscription) {
+    document.getElementById('tEditSubDuration').value = t.subscriptionDurationMin || '';
+    document.getElementById('tEditSubLifetime').value = t.subscriptionLifetimeHrs || '';
+    document.getElementById('tEditSubPrice').value = t.subscriptionPrice || '';
+  }
 
   const bonusEnabled = (t.bonusSpendMaxPercent || 0) > 0;
   document.getElementById('tEditBonusEnabled').checked = bonusEnabled;
@@ -1153,6 +1162,11 @@ function initTariffsForm() {
     if (t.type === 'BASE') {
       body.minChargedMinutes = Number(document.getElementById('tEditMinCharged').value) || 0;
     }
+    if (t.type === 'SUBSCRIPTION') {
+      body.subscriptionDurationMin = Number(document.getElementById('tEditSubDuration').value) || undefined;
+      body.subscriptionLifetimeHrs = Number(document.getElementById('tEditSubLifetime').value) || undefined;
+      body.subscriptionPrice = Number(document.getElementById('tEditSubPrice').value) || undefined;
+    }
 
     const res = await adminFetch(`/api/tariffs/${tariffEditingId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -1161,6 +1175,18 @@ function initTariffsForm() {
     if (!res.ok) {
       const data = await res.json().catch(() => null);
       alert(data?.error || 'Не удалось сохранить тариф.');
+      return;
+    }
+    editBackdrop.style.display = 'none';
+    loadTariffs();
+  });
+
+  document.getElementById('tEditModalDelete').addEventListener('click', async () => {
+    if (!confirm('Удалить этот тариф?')) return;
+    const res = await adminFetch(`/api/tariffs/${tariffEditingId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      alert(data?.error || 'Не удалось удалить тариф.');
       return;
     }
     editBackdrop.style.display = 'none';

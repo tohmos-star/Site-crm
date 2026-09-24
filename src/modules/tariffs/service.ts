@@ -144,6 +144,30 @@ export class TariffService {
     }
   }
 
+  async deleteTariff(id: string) {
+    await this.getTariff(id);
+
+    const [ruleCount, bookingCount, sessionCount, subscriptionCount, defaultZoneCount] = await Promise.all([
+      this.prisma.tariffRule.count({ where: { tariffId: id } }),
+      this.prisma.booking.count({ where: { tariffId: id } }),
+      this.prisma.session.count({ where: { tariffId: id } }),
+      this.prisma.guestSubscription.count({ where: { tariffId: id } }),
+      this.prisma.zone.count({ where: { defaultTariffId: id } }),
+    ]);
+    // Тот же приём, что и в zones/day-types service.ts: явная проверка
+    // вместо необработанной FK-ошибки (P2003) → голый 500.
+    if (ruleCount > 0 || bookingCount > 0 || sessionCount > 0 || subscriptionCount > 0 || defaultZoneCount > 0) {
+      throw new DomainError(
+        "TARIFF_HAS_DEPENDENCIES",
+        `Нельзя удалить тариф: на него ссылаются правила цен (${ruleCount}), брони (${bookingCount}), ` +
+          `сессии (${sessionCount}), абонементы гостей (${subscriptionCount}) или зоны по умолчанию (${defaultZoneCount})`,
+        409,
+      );
+    }
+
+    await this.prisma.tariff.delete({ where: { id } });
+  }
+
   // connect/set на несуществующий id уровня лояльности (устаревший кэш в
   // админке и т.п.) иначе падает необработанной P2025 → голый 500 без
   // объяснения, что именно не так.

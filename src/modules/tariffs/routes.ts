@@ -86,6 +86,13 @@ const tariffRoutes: FastifyPluginAsync = async (fastify) => {
     handler: async (request) =>
       service.updateTariff((request.params as { id: string }).id, request.body as never),
   });
+  fastify.delete("/tariffs/:id", {
+    schema: { params: IdParams },
+    handler: async (request, reply) => {
+      await service.deleteTariff((request.params as { id: string }).id);
+      reply.code(204);
+    },
+  });
 
   fastify.get("/tariff-rules", {
     schema: { querystring: Type.Object({ tariffId: Type.Optional(Type.String()) }) },
