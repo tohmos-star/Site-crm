@@ -86,7 +86,6 @@
     <button class="side-menu-item" data-tab="access">Домофон и коды</button>
     <button class="side-menu-item" data-tab="guests">Гости</button>
     <button class="side-menu-item" data-tab="devices">Устройства</button>
-    <button class="side-menu-item" data-tab="loyalty">Лояльность</button>
     <button class="side-menu-item" data-tab="analytics">Статистика</button>
   </nav>
 
@@ -169,59 +168,6 @@
           <tbody id="dTableBody"><tr><td colspan="5" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
         </table>
       </div>
-    </section>
-
-    <!-- ---- Лояльность ---- -->
-    <section class="tab-panel" id="tab-loyalty">
-      <h3 style="font-size:14px; margin:0 0 10px;">Группы гостей (по накопленным часам)</h3>
-      <div class="filter-row" style="align-items:flex-end;">
-        <div class="field" style="margin:0;"><label>Название</label><input type="text" id="ltNewName" placeholder="Серебро" style="width:140px;"></div>
-        <div class="field" style="margin:0;"><label>Часов от</label><input type="number" id="ltNewMinHours" value="0" style="width:90px;"></div>
-        <div class="field" style="margin:0;"><label>Часов до</label><input type="number" id="ltNewMaxHours" placeholder="∞" style="width:90px;"></div>
-        <div class="field" style="margin:0;"><label>% скидки</label><input type="number" id="ltNewDiscount" value="0" style="width:90px;"></div>
-        <div class="field" style="margin:0;"><label>% кэшбэка</label><input type="number" id="ltNewCashback" value="0" style="width:90px;"></div>
-        <button class="btn btn-primary" id="ltAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить</button>
-      </div>
-      <table class="admin-table" style="margin-bottom:24px;">
-        <thead><tr><th>Название</th><th>Часов от</th><th>Часов до</th><th>% скидки</th><th>% кэшбэка</th></tr></thead>
-        <tbody id="ltTableBody"><tr><td colspan="5" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
-      </table>
-
-      <h3 style="font-size:14px; margin:0 0 10px;">Ручные группы гостей</h3>
-      <div class="filter-row">
-        <input type="text" id="mgNewName" placeholder="Уважаемые люди" style="width:200px;">
-        <input type="number" id="mgNewDiscount" placeholder="% скидки" style="width:100px;">
-        <button class="btn btn-primary" id="mgAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить</button>
-      </div>
-      <table class="admin-table" style="margin-bottom:24px;">
-        <thead><tr><th>Название</th><th>% скидки</th></tr></thead>
-        <tbody id="mgTableBody"><tr><td colspan="2" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
-      </table>
-
-      <h3 style="font-size:14px; margin:0 0 10px;">Автобонусы</h3>
-
-      <h4 style="font-size:13px; color:var(--text-muted); margin:0 0 8px;">Бонус за регистрацию</h4>
-      <div class="filter-row">
-        <select id="abRegRewardType"><option value="PERCENT">% от суммы</option><option value="FIXED">Фикс. сумма</option></select>
-        <input type="number" id="abRegRewardValue" placeholder="Значение" style="width:100px;">
-        <button class="btn btn-primary" id="abRegAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить</button>
-      </div>
-      <table class="admin-table" style="margin-bottom:24px;">
-        <thead><tr><th>Награда</th><th></th></tr></thead>
-        <tbody id="abRegTableBody"><tr><td colspan="2" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
-      </table>
-
-      <h4 style="font-size:13px; color:var(--text-muted); margin:0 0 8px;">Бонус за пополнение (кэшбэк по диапазону суммы)</h4>
-      <div class="filter-row">
-        <input type="number" id="abTopupFrom" placeholder="Сумма от" style="width:110px;">
-        <input type="number" id="abTopupTo" placeholder="Сумма до" style="width:110px;">
-        <input type="number" id="abTopupPercent" placeholder="% кэшбэка" style="width:100px;">
-        <button class="btn btn-primary" id="abTopupAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить</button>
-      </div>
-      <table class="admin-table">
-        <thead><tr><th>Сумма от</th><th>Сумма до</th><th>% кэшбэка</th><th></th></tr></thead>
-        <tbody id="abTopupTableBody"><tr><td colspan="4" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
-      </table>
     </section>
 
     <!-- ---- 4. Статистика ---- -->

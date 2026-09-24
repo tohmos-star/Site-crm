@@ -609,148 +609,20 @@ function initDevicesTab() {
 }
 
 // ---------------------------------------------------------------------
-// Лояльность
+// Лояльность (вкладка управления в архиве — см. ARCHIVED_SECTIONS.md)
 // ---------------------------------------------------------------------
 
+// Сама вкладка "Лояльность" убрана, но кэши остаются: "Гости" всё ещё
+// назначает гостю уровень/ручную группу из уже существующих (см.
+// loadGuests — TIERS_CACHE/MANUAL_GROUPS_CACHE лениво подгружаются оттуда же).
 async function loadLoyaltyTiers() {
-  const tbody = document.getElementById('ltTableBody');
   const res = await adminFetch('/api/loyalty/tiers');
-  const tiers = await res.json();
-  TIERS_CACHE = tiers;
-  if (!tiers.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);">Пусто</td></tr>';
-    return;
-  }
-  tbody.innerHTML = tiers.map(t => `
-    <tr>
-      <td>${escapeHtml(t.name)}</td>
-      <td>${t.minHours}</td>
-      <td>${t.maxHours ?? '∞'}</td>
-      <td>${t.discountPercent ?? 0}%</td>
-      <td>${t.cashbackPercent ?? 0}%</td>
-    </tr>
-  `).join('');
-}
-
-function initLoyaltyTiersForm() {
-  document.getElementById('ltAddSubmit').addEventListener('click', async () => {
-    const name = document.getElementById('ltNewName').value.trim();
-    const minHours = Number(document.getElementById('ltNewMinHours').value) || 0;
-    const maxHoursRaw = document.getElementById('ltNewMaxHours').value;
-    const discountPercent = Number(document.getElementById('ltNewDiscount').value) || 0;
-    const cashbackPercent = Number(document.getElementById('ltNewCashback').value) || 0;
-    if (!name) return;
-    await adminFetch('/api/loyalty/tiers', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name, minHours, discountPercent, cashbackPercent,
-        maxHours: maxHoursRaw ? Number(maxHoursRaw) : undefined,
-      }),
-    });
-    document.getElementById('ltNewName').value = '';
-    document.getElementById('ltNewMinHours').value = '0';
-    document.getElementById('ltNewMaxHours').value = '';
-    document.getElementById('ltNewDiscount').value = '0';
-    document.getElementById('ltNewCashback').value = '0';
-    loadLoyaltyTiers();
-  });
+  TIERS_CACHE = await res.json();
 }
 
 async function loadManualGroups() {
-  const tbody = document.getElementById('mgTableBody');
   const res = await adminFetch('/api/loyalty/manual-groups');
-  const groups = await res.json();
-  MANUAL_GROUPS_CACHE = groups;
-  if (!groups.length) {
-    tbody.innerHTML = '<tr><td colspan="2" style="color:var(--text-muted);">Пусто</td></tr>';
-    return;
-  }
-  tbody.innerHTML = groups.map(g => `<tr><td>${escapeHtml(g.name)}</td><td>${g.discountPercent ?? 0}%</td></tr>`).join('');
-}
-
-function initManualGroupsForm() {
-  document.getElementById('mgAddSubmit').addEventListener('click', async () => {
-    const name = document.getElementById('mgNewName').value.trim();
-    const discountPercent = Number(document.getElementById('mgNewDiscount').value) || 0;
-    if (!name) return;
-    await adminFetch('/api/loyalty/manual-groups', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, discountPercent }),
-    });
-    document.getElementById('mgNewName').value = '';
-    document.getElementById('mgNewDiscount').value = '';
-    loadManualGroups();
-  });
-}
-
-async function deleteAutoBonusRule(id) {
-  if (!confirm('Удалить правило автобонуса?')) return;
-  await adminFetch(`/api/loyalty/auto-bonus-rules/${id}`, { method: 'DELETE' });
-  loadAutoBonusRules();
-}
-
-async function loadAutoBonusRules() {
-  const regBody = document.getElementById('abRegTableBody');
-  const topupBody = document.getElementById('abTopupTableBody');
-  const res = await adminFetch('/api/loyalty/auto-bonus-rules');
-  const rules = await res.json();
-
-  const regRules = rules.filter(r => r.trigger === 'REGISTRATION');
-  const topupRules = rules.filter(r => r.trigger === 'TOPUP');
-
-  regBody.innerHTML = regRules.length ? regRules.map(r => `
-    <tr>
-      <td>${r.rewardType === 'PERCENT' ? r.rewardValue + '%' : r.rewardValue + ' ₽'}</td>
-      <td><div class="row-actions"><button class="btn btn-ghost" data-delete-bonus="${r.id}">Удалить</button></div></td>
-    </tr>
-  `).join('') : '<tr><td colspan="2" style="color:var(--text-muted);">Пусто</td></tr>';
-
-  topupBody.innerHTML = topupRules.length ? topupRules.map(r => `
-    <tr>
-      <td>${r.minAmount ?? '—'}</td>
-      <td>${r.maxAmount ?? '—'}</td>
-      <td>${r.rewardType === 'PERCENT' ? r.rewardValue + '%' : r.rewardValue + ' ₽'}</td>
-      <td><div class="row-actions"><button class="btn btn-ghost" data-delete-bonus="${r.id}">Удалить</button></div></td>
-    </tr>
-  `).join('') : '<tr><td colspan="4" style="color:var(--text-muted);">Пусто</td></tr>';
-
-  [regBody, topupBody].forEach(tbody => {
-    tbody.querySelectorAll('[data-delete-bonus]').forEach(btn => {
-      btn.addEventListener('click', () => deleteAutoBonusRule(btn.dataset.deleteBonus));
-    });
-  });
-}
-
-function initAutoBonusForm() {
-  document.getElementById('abRegAddSubmit').addEventListener('click', async () => {
-    const rewardType = document.getElementById('abRegRewardType').value;
-    const rewardValue = Number(document.getElementById('abRegRewardValue').value);
-    if (!rewardValue) return;
-    await adminFetch('/api/loyalty/auto-bonus-rules', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clubId: CLUB_ID, trigger: 'REGISTRATION', rewardType, rewardValue }),
-    });
-    document.getElementById('abRegRewardValue').value = '';
-    loadAutoBonusRules();
-  });
-
-  document.getElementById('abTopupAddSubmit').addEventListener('click', async () => {
-    const minAmount = Number(document.getElementById('abTopupFrom').value);
-    const maxAmount = Number(document.getElementById('abTopupTo').value);
-    const rewardValue = Number(document.getElementById('abTopupPercent').value);
-    if (!minAmount || !maxAmount || !rewardValue) return;
-    await adminFetch('/api/loyalty/auto-bonus-rules', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        clubId: CLUB_ID, trigger: 'TOPUP', rewardType: 'PERCENT', rewardValue,
-        minAmount, maxAmount,
-      }),
-    });
-    document.getElementById('abTopupFrom').value = '';
-    document.getElementById('abTopupTo').value = '';
-    document.getElementById('abTopupPercent').value = '';
-    loadAutoBonusRules();
-  });
+  MANUAL_GROUPS_CACHE = await res.json();
 }
 
 // ---------------------------------------------------------------------
@@ -800,9 +672,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   initAccessForm();
   initGuestsTab();
   initDevicesTab();
-  initLoyaltyTiersForm();
-  initManualGroupsForm();
-  initAutoBonusForm();
 
   document.getElementById('vStatusFilter').addEventListener('change', loadRegistrations);
   document.getElementById('vRefresh').addEventListener('click', loadRegistrations);
@@ -824,8 +693,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadCommonCaches();
     populateZoneSelects();
     loadDevices();
-    loadLoyaltyTiers();
-    loadManualGroups();
-    loadAutoBonusRules();
   } catch { /* handled by adminFetch redirect */ }
 });
