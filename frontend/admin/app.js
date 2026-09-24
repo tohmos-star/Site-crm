@@ -1001,6 +1001,7 @@ function renderTariffsTable() {
           <div class="row-actions">
             <button class="btn btn-ghost" data-edit-tariff="${t.id}" title="Редактировать">✎</button>
             <button class="btn btn-ghost" data-manage-rules="${t.id}" data-tariff-name="${escapeHtml(t.name)}">Правила цен</button>
+            <button class="btn btn-ghost" data-delete-tariff="${t.id}" title="Удалить" style="color:var(--accent);">🗑</button>
           </div>
         </td>
       </tr>
@@ -1014,6 +1015,18 @@ function renderTariffsTable() {
     btn.addEventListener('click', async () => {
       if (!TIERS_CACHE.length) await loadLoyaltyTiers();
       openTariffEditModal(btn.dataset.editTariff);
+    });
+  });
+  tbody.querySelectorAll('[data-delete-tariff]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Удалить этот тариф?')) return;
+      const res = await adminFetch(`/api/tariffs/${btn.dataset.deleteTariff}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        alert(data?.error || 'Не удалось удалить тариф.');
+        return;
+      }
+      loadTariffs();
     });
   });
 }
