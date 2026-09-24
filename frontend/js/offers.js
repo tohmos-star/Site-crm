@@ -177,13 +177,19 @@ function nextQuestion() {
 
 async function submitSurvey() {
   try {
-    await fetch('/api/offers/survey', {
+    const res = await fetch('/api/offers/survey', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ answers }),
     });
+    if (!res.ok) throw new Error();
   } catch (err) {
-    console.warn('survey submit failed, showing demo final screen', err);
+    // TODO: /api/offers/survey пока не существует на бэкенде — отвечает
+    // 404, поэтому опрос никогда не проходит по-настоящему успешно, пока
+    // ручку не заведут (см. submitFreeText ниже — та же история с /api/offers).
+    console.warn('survey submit failed', err);
+    alert('Не удалось отправить ответы — попробуйте позже.');
+    return;
   }
   showStep('step-survey-final');
 }

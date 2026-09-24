@@ -95,11 +95,18 @@ async function submitRegistration() {
 
   try {
     const res = await fetch('/api/registrations', { method: 'POST', body: formData });
-    if (!res.ok) throw new Error();
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      btn.disabled = false;
+      btn.textContent = 'Отправить на проверку';
+      alert(data?.error || 'Не удалось отправить заявку. Проверьте данные и попробуйте ещё раз.');
+      return;
+    }
   } catch (err) {
-    // Демо-режим без backend — всё равно показываем финальный экран,
-    // чтобы можно было оценить флоу целиком.
-    console.warn('registration submit failed, showing demo pending screen', err);
+    btn.disabled = false;
+    btn.textContent = 'Отправить на проверку';
+    alert('Не удалось отправить заявку — нет связи с сервером. Попробуйте ещё раз.');
+    return;
   }
 
   showStep('step-pending');

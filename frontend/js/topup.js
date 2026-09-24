@@ -1,8 +1,6 @@
-// Пополнение баланса. Без подключённого эквайринга backend работает в
-// dev-режиме — POST /api/topup возвращает devMode:true, и кнопка "Демо:
-// платёж пришёл" подтверждает вручную (см. backend/src/routes/topup.ts).
-// Когда провайдер подключат, dev-confirm сам отключится на сервере, и эту
-// кнопку нужно будет спрятать по devMode:false из ответа /api/topup.
+// Пополнение баланса. POST /api/topup (см. src/modules/guestSelfService)
+// зачисляет сумму синхронно и сразу возвращает новый баланс — реального
+// эквайринга/СБП за этим пока нет, это прямое зачисление на баланс гостя.
 
 function getToken() { return localStorage.getItem('authToken'); }
 function fmtMoney(n) { return `${Math.round(n)} ₽`; }
@@ -18,8 +16,6 @@ async function authedFetch(url, options = {}) {
   return res;
 }
 
-let currentIntentId = null;
-
 async function loadBalance() {
   const res = await authedFetch('/api/auth/me');
   const data = await res.json();
@@ -28,7 +24,6 @@ async function loadBalance() {
 
 function showStep(step) {
   document.getElementById('stepPick').style.display = step === 'pick' ? 'block' : 'none';
-  document.getElementById('stepWaiting').style.display = step === 'waiting' ? 'block' : 'none';
   document.getElementById('stepDone').style.display = step === 'done' ? 'block' : 'none';
 }
 
@@ -43,60 +38,39 @@ async function startPayment() {
 
   const btn = document.getElementById('payBtn');
   btn.disabled = true;
-  btn.textContent = 'Готовим оплату…';
+  btn.textContent = 'Пополняем…';
 
   try {
     const res = await authedFetch('/api/topup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amountRub: amount }),
+      body: JSON.stringify({ amount }),
     });
     const data = await res.json();
+    btn.disabled = false;
+    btn.textContent = 'Оплатить через СБП';
     if (!res.ok) {
-      statusEl.textContent = data.error || 'Не удалось создать платёж.';
+      statusEl.textContent = data.error || 'Не удалось пополнить баланс.';
       statusEl.className = 'status-msg show err';
-      btn.disabled = false;
-      btn.textContent = 'Оплатить через СБП';
       return;
     }
 
-    currentIntentId = data.intentId;
-    document.getElementById('waitingAmount').textContent = `${amount} ₽ через СБП`;
-    document.getElementById('devConfirmBtn').style.display = data.devMode ? 'block' : 'none';
-    showStep('waiting');
-  } catch {
-    statusEl.textContent = 'Не удалось создать платёж. Попробуйте ещё раз.';
-    statusEl.className = 'status-msg show err';
-    btn.disabled = false;
-    btn.textContent = 'Оплатить через СБП';
-  }
-}
-
-async function devConfirm() {
-  if (!currentIntentId) return;
-  const btn = document.getElementById('devConfirmBtn');
-  btn.disabled = true;
-  btn.textContent = 'Подтверждаем…';
-  try {
-    const res = await authedFetch(`/api/topup/${currentIntentId}/dev-confirm`, { method: 'POST' });
-    if (!res.ok) throw new Error('confirm failed');
-    await loadBalance();
+    document.getElementById('balanceLine').textContent = fmtMoney(data.balanceRub);
     showStep('done');
   } catch {
     btn.disabled = false;
-    btn.textContent = 'Демо: платёж пришёл';
+    btn.textContent = 'Оплатить через СБП';
+    statusEl.textContent = 'Не удалось пополнить баланс. Попробуйте ещё раз.';
+    statusEl.className = 'status-msg show err';
   }
 }
 
 function resetForm() {
-  currentIntentId = null;
   document.getElementById('amountInput').value = '300';
   document.getElementById('topupStatus').textContent = '';
   document.getElementById('topupStatus').className = 'status-msg';
   document.getElementById('payBtn').disabled = false;
   document.getElementById('payBtn').textContent = 'Оплатить через СБП';
-  document.getElementById('devConfirmBtn').disabled = false;
-  document.getElementById('devConfirmBtn').textContent = 'Демо: платёж пришёл';
   showStep('pick');
 }
 
@@ -113,7 +87,6 @@ function init() {
     });
   });
   document.getElementById('payBtn').addEventListener('click', startPayment);
-  document.getElementById('devConfirmBtn').addEventListener('click', devConfirm);
   document.getElementById('topupAgainBtn').addEventListener('click', resetForm);
 
   loadBalance();

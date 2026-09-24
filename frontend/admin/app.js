@@ -378,7 +378,7 @@ async function saveGuest(id) {
   const manualGroupId = row.querySelector('[data-field="manualGroupId"]').value || null;
   const tierId = row.querySelector('[data-field="tierId"]').value || null;
 
-  await Promise.all([
+  const [profileRes, groupRes, tierRes] = await Promise.all([
     adminFetch(`/api/admin/guests/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -395,6 +395,13 @@ async function saveGuest(id) {
       body: JSON.stringify({ tierId }),
     }),
   ]);
+
+  const failed = [profileRes, groupRes, tierRes].find((res) => !res.ok);
+  if (failed) {
+    const data = await failed.json().catch(() => null);
+    alert(data?.error || 'Не удалось сохранить гостя — проверьте данные (например, телефон может быть занят другим гостем).');
+  }
+  loadGuests(document.getElementById('gSearch').value.trim());
 }
 
 async function recalcGuestTier(id) {
@@ -665,7 +672,7 @@ function renderZonesTable() {
     const nameEnCell = z.id === zoneEditingId
       ? `<input type="text" class="z-edit-nameEn" value="${escapeHtml(z.nameEn || '')}" style="${SELECT_STYLE} width:110px;">`
       : escapeHtml(z.nameEn || '—');
-    const colorCell = `<input type="color" class="z-color-picker" data-zone-id="${z.id}" value="${z.color}" style="width:40px; height:30px; padding:2px; border:1px solid var(--border); border-radius:5px; background:var(--bg); cursor:pointer;">`;
+    const colorCell = `<input type="color" class="z-color-picker" data-zone-id="${z.id}" value="${escapeHtml(z.color)}" style="width:40px; height:30px; padding:2px; border:1px solid var(--border); border-radius:5px; background:var(--bg); cursor:pointer;">`;
     const actionsCell = z.id === zoneEditingId
       ? `<div class="row-actions">
           <button class="btn btn-ghost" data-save-zone="${z.id}" title="Сохранить" style="padding:4px 8px; color:#4ADE9C;">✓</button>
@@ -884,10 +891,22 @@ function initTariffsForm() {
     const name = document.getElementById('tNewName').value.trim();
     const packageDurationMin = Number(document.getElementById('tNewPackageMin').value) || undefined;
     if (!groupId || !name) return;
-    await adminFetch('/api/tariffs', {
+    const res = await adminFetch('/api/tariffs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ groupId, type, name, packageDurationMin: type === 'PACKAGE' ? packageDurationMin : undefined }),
+      body: JSON.stringify({
+        groupId, type, name,
+        // packageMode обязателен на сервере для PACKAGE (см. tariffs/service.ts)
+        // — форма поддерживает только фиксированную длительность, второй
+        // режим (FIXED_END) в этой форме пока не заведён.
+        packageMode: type === 'PACKAGE' ? 'FIXED_DURATION' : undefined,
+        packageDurationMin: type === 'PACKAGE' ? packageDurationMin : undefined,
+      }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      alert(data?.error || 'Не удалось добавить тариф — проверьте поля.');
+      return;
+    }
     document.getElementById('tNewName').value = '';
     document.getElementById('tNewPackageMin').value = '';
     loadTariffs();

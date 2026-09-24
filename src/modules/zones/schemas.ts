@@ -4,7 +4,9 @@ export const ZoneBody = Type.Object({
   clubId: Type.String(),
   nameRu: Type.String({ minLength: 1 }),
   nameEn: Type.Optional(Type.String()),
-  color: Type.Optional(Type.String()),
+  // Ограничен по формату hex-цвета — без этого произвольная строка попадала
+  // прямо в атрибут value="" в админке (frontend/admin/app.js) без экранирования.
+  color: Type.Optional(Type.String({ pattern: "^#[0-9a-fA-F]{6}$" })),
   sortOrder: Type.Optional(Type.Integer()),
   isRoom: Type.Optional(Type.Boolean()),
   // Null первым в union — иначе Ajv (coerceTypes: true) молча превращает

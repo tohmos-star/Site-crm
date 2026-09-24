@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import ru.club404.guest.data.Booking
 import ru.club404.guest.data.BookingQuote
@@ -212,7 +213,17 @@ private fun WalkInDialog(onDismiss: () -> Unit) {
 
     LaunchedEffect(selectedStationId, minutes) {
         val stationId = selectedStationId
-        quote = if (stationId != null) repository.quoteBooking(stationId, minutes) else null
+        if (stationId == null) {
+            quote = null
+            return@LaunchedEffect
+        }
+        try {
+            quote = repository.quoteBooking(stationId, minutes)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            error = e.message ?: "Не удалось рассчитать стоимость."
+        }
     }
 
     Dialog(onDismissRequest = onDismiss) {

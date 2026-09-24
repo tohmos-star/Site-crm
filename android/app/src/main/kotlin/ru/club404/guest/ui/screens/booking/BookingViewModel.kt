@@ -2,6 +2,8 @@ package ru.club404.guest.ui.screens.booking
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -100,11 +102,23 @@ class BookingViewModel(private val repository: GuestRepository) : ViewModel() {
         _state.update { it.copy(useBonus = !it.useBonus) }
     }
 
+    // Job хранится явно, чтобы отменить предыдущий запрос при быстром
+    // переключении места/длительности — иначе более старый ответ может
+    // прилететь позже нового и затереть актуальную цену устаревшей.
+    private var quoteJob: Job? = null
+
     private fun refreshQuote() {
         val stationId = _state.value.selectedStationId ?: return
-        viewModelScope.launch {
-            val quote = repository.quoteBooking(stationId, _state.value.durationMinutes)
-            _state.update { it.copy(quote = quote) }
+        quoteJob?.cancel()
+        quoteJob = viewModelScope.launch {
+            try {
+                val quote = repository.quoteBooking(stationId, _state.value.durationMinutes)
+                _state.update { it.copy(quote = quote) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message ?: "Не удалось рассчитать стоимость.") }
+            }
         }
     }
 
