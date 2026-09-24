@@ -256,23 +256,13 @@
         </div>
       </div>
 
-      <!-- Группы тарифов: пока прежний функционал (категории + список тарифов
-           + правила цен) — расширенные поля тарифа (доступ по группе гостей,
-           списание бонусов, канал) добавим по скриншоту нужного экрана. -->
+      <!-- Группы тарифов: категория-обёртка (TariffGroup) больше не видна
+           админу — лишний уровень по сравнению с референсом LANGAME.
+           Ровно одна группа заводится/используется автоматически
+           (см. ensureDefaultTariffGroupId в app.js). -->
       <div class="subtab-panel" id="subtab-groups">
-        <h3 style="font-size:14px; margin:0 0 10px;">Группы тарифов</h3>
-        <div class="filter-row">
-          <input type="text" id="tgNewName" placeholder="Основные" style="width:200px;">
-          <button class="btn btn-primary" id="tgAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить</button>
-        </div>
-        <table class="admin-table" style="margin-bottom:24px;">
-          <thead><tr><th>Название</th></tr></thead>
-          <tbody id="tgTableBody"><tr><td colspan="1" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
-        </table>
-
         <h3 style="font-size:14px; margin:0 0 10px;">Тарифы</h3>
         <div class="filter-row" style="align-items:flex-end;">
-          <div class="field" style="margin:0;"><label>Группа</label><select id="tNewGroup" style="width:160px;"></select></div>
           <div class="field" style="margin:0;"><label>Тип тарифа</label>
             <select id="tNewType" style="width:190px;">
               <option value="BASE">Базовый (почасовой)</option>

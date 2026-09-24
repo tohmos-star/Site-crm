@@ -904,31 +904,25 @@ function initDayTypesForm() {
   });
 }
 
+// Категории тарифов ("Группы тарифов") больше не показываются админу —
+// это оказался лишний уровень по сравнению с референсом LANGAME. Кэш всё
+// ещё нужен (renderTariffsTable показывает имя группы, а createTariff
+// требует groupId), поэтому просто подгружаем список и при необходимости
+// заводим ровно одну группу по умолчанию, без какого-либо UI управления ею.
 async function loadTariffGroups() {
-  const tbody = document.getElementById('tgTableBody');
   const res = await adminFetch(`/api/tariff-groups?clubId=${CLUB_ID}`);
   TARIFF_GROUPS_CACHE = await res.json();
-  document.getElementById('tNewGroup').innerHTML =
-    TARIFF_GROUPS_CACHE.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');
-
-  if (!TARIFF_GROUPS_CACHE.length) {
-    tbody.innerHTML = '<tr><td style="color:var(--text-muted);">Пусто</td></tr>';
-    return;
-  }
-  tbody.innerHTML = TARIFF_GROUPS_CACHE.map(g => `<tr><td>${escapeHtml(g.name)}</td></tr>`).join('');
 }
 
-function initTariffGroupsForm() {
-  document.getElementById('tgAddSubmit').addEventListener('click', async () => {
-    const name = document.getElementById('tgNewName').value.trim();
-    if (!name) return;
-    await adminFetch('/api/tariff-groups', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clubId: CLUB_ID, name }),
-    });
-    document.getElementById('tgNewName').value = '';
-    loadTariffGroups();
+async function ensureDefaultTariffGroupId() {
+  if (TARIFF_GROUPS_CACHE.length) return TARIFF_GROUPS_CACHE[0].id;
+  const res = await adminFetch('/api/tariff-groups', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clubId: CLUB_ID, name: 'Основные' }),
   });
+  const group = await res.json();
+  TARIFF_GROUPS_CACHE = [group];
+  return group.id;
 }
 
 // "Пакет" на сервере — один type с двумя режимами (packageMode); админу
@@ -1091,10 +1085,10 @@ function initTariffsForm() {
   });
 
   document.getElementById('tAddSubmit').addEventListener('click', async () => {
-    const groupId = document.getElementById('tNewGroup').value;
     const uiType = typeSelect.value; // BASE | FIXED_DURATION | FIXED_END | SUBSCRIPTION
     const name = document.getElementById('tNewName').value.trim();
-    if (!groupId || !name) return;
+    if (!name) return;
+    const groupId = await ensureDefaultTariffGroupId();
 
     const body = { groupId, name };
     if (uiType === 'BASE') {
@@ -1525,7 +1519,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   initDevicesTab();
   initZonesTab();
   initDayTypesForm();
-  initTariffGroupsForm();
   initTariffsForm();
   initTariffRulesForm();
   initLoyaltyTiersForm();
