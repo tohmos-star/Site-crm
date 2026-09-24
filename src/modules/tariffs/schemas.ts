@@ -3,10 +3,15 @@ import { Type, type Static } from "@sinclair/typebox";
 export const DayTypeBody = Type.Object({
   clubId: Type.String(),
   name: Type.String({ minLength: 1 }),
-  color: Type.Optional(Type.String()),
+  // Ограничен по формату hex-цвета — см. тот же фикс для zones/schemas.ts
+  // (произвольная строка попадала прямо в атрибут value="" в админке).
+  color: Type.Optional(Type.String({ pattern: "^#[0-9a-fA-F]{6}$" })),
   weekdays: Type.Array(Type.Integer({ minimum: 0, maximum: 6 }), { minItems: 1 }),
 });
 export type DayTypeBody = Static<typeof DayTypeBody>;
+
+export const DayTypeParams = Type.Object({ id: Type.String() });
+export type DayTypeParams = Static<typeof DayTypeParams>;
 
 export const HolidayOverrideBody = Type.Object({
   clubId: Type.String(),

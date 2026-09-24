@@ -34,8 +34,39 @@ export class TariffService {
     return this.prisma.dayType.findMany({ where: clubId ? { clubId } : undefined });
   }
 
+  async getDayType(id: string) {
+    const dayType = await this.prisma.dayType.findUnique({ where: { id } });
+    if (!dayType) throw new NotFoundError("DayType", id);
+    return dayType;
+  }
+
   createDayType(body: DayTypeBody) {
     return this.prisma.dayType.create({ data: body });
+  }
+
+  async updateDayType(id: string, body: Partial<DayTypeBody>) {
+    await this.getDayType(id);
+    return this.prisma.dayType.update({ where: { id }, data: body });
+  }
+
+  async deleteDayType(id: string) {
+    await this.getDayType(id);
+
+    const [ruleCount, overrideCount] = await Promise.all([
+      this.prisma.tariffRule.count({ where: { dayTypeId: id } }),
+      this.prisma.holidayOverride.count({ where: { dayTypeId: id } }),
+    ]);
+    // Без этой проверки prisma.dayType.delete() падает необработанной
+    // FK-ошибкой (P2003) — см. тот же фикс в zones/service.ts.
+    if (ruleCount > 0 || overrideCount > 0) {
+      throw new DomainError(
+        "DAY_TYPE_HAS_DEPENDENCIES",
+        `Нельзя удалить тип дня: на него ссылаются ${ruleCount} правил(а) цен и ${overrideCount} переопределений(я) календаря`,
+        409,
+      );
+    }
+
+    await this.prisma.dayType.delete({ where: { id } });
   }
 
   listHolidayOverrides(clubId?: string) {

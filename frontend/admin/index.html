@@ -220,28 +220,40 @@
         <button class="subtab-btn" data-subtab="packages">Пакеты</button>
       </div>
 
-      <!-- Типы дней: без изменений по функциям, просто вынесено в свою подвкладку. -->
+      <!-- Типы дней: как на скриншоте LANGAME — модалка добавления/редактирования
+           (по образцу zModal у зон) вместо инлайн-формы, + цвет, + правка/удаление. -->
       <div class="subtab-panel active" id="subtab-daytypes">
-        <div class="filter-row" style="align-items:flex-end;">
-          <div class="field" style="margin:0;"><label>Название</label><input type="text" id="dtNewName" placeholder="Будни" style="width:140px;"></div>
-          <div style="display:flex; flex-direction:column; gap:4px;">
-            <label style="font-size:12px; color:var(--text-muted);">Дни недели</label>
-            <div style="display:flex; gap:6px;">
-              <label><input type="checkbox" class="dt-weekday" value="1" style="width:auto;"> Пн</label>
-              <label><input type="checkbox" class="dt-weekday" value="2" style="width:auto;"> Вт</label>
-              <label><input type="checkbox" class="dt-weekday" value="3" style="width:auto;"> Ср</label>
-              <label><input type="checkbox" class="dt-weekday" value="4" style="width:auto;"> Чт</label>
-              <label><input type="checkbox" class="dt-weekday" value="5" style="width:auto;"> Пт</label>
-              <label><input type="checkbox" class="dt-weekday" value="6" style="width:auto;"> Сб</label>
-              <label><input type="checkbox" class="dt-weekday" value="0" style="width:auto;"> Вс</label>
-            </div>
-          </div>
-          <button class="btn btn-primary" id="dtAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить</button>
+        <div class="filter-row" style="justify-content:flex-end;">
+          <button class="btn btn-primary" id="dtAddBtn" style="padding:8px 14px; font-size:13px;">+ Добавить группу</button>
         </div>
         <table class="admin-table">
-          <thead><tr><th>Название</th><th>Дни</th></tr></thead>
-          <tbody id="dtTableBody"><tr><td colspan="2" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
+          <thead><tr><th>Название</th><th>Дни</th><th>Цвет</th><th></th></tr></thead>
+          <tbody id="dtTableBody"><tr><td colspan="4" style="color:var(--text-muted);">Загрузка…</td></tr></tbody>
         </table>
+      </div>
+
+      <div class="modal-backdrop" id="dtModalBackdrop" style="display:none;">
+        <div class="modal-box">
+          <div class="modal-head">
+            <h3 id="dtModalTitle">Добавить группу</h3>
+            <button type="button" class="modal-close" id="dtModalClose">&times;</button>
+          </div>
+          <div class="field"><label>Наименование</label><input type="text" id="dtModalName" placeholder="Будни"></div>
+          <div class="field">
+            <label>Дни недели</label>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <label><input type="checkbox" class="dt-modal-weekday" value="1"> Пн</label>
+              <label><input type="checkbox" class="dt-modal-weekday" value="2"> Вт</label>
+              <label><input type="checkbox" class="dt-modal-weekday" value="3"> Ср</label>
+              <label><input type="checkbox" class="dt-modal-weekday" value="4"> Чт</label>
+              <label><input type="checkbox" class="dt-modal-weekday" value="5"> Пт</label>
+              <label><input type="checkbox" class="dt-modal-weekday" value="6"> Сб</label>
+              <label><input type="checkbox" class="dt-modal-weekday" value="0"> Вс</label>
+            </div>
+          </div>
+          <div class="field"><label>Цвет</label><input type="color" id="dtModalColor" value="#f8f00d" style="height:38px; padding:2px;"></div>
+          <button class="btn btn-primary" id="dtModalSave" style="width:100%; justify-content:center;">Сохранить</button>
+        </div>
       </div>
 
       <!-- Группы тарифов: пока прежний функционал (категории + список тарифов

@@ -807,6 +807,8 @@ function initZonesTab() {
 // Тарифы (типы дней / группы / тарифы / правила цен)
 // ---------------------------------------------------------------------
 
+let dayTypeEditingId = null;
+
 async function loadDayTypes() {
   const tbody = document.getElementById('dtTableBody');
   const res = await adminFetch(`/api/day-types?clubId=${CLUB_ID}`);
@@ -815,25 +817,81 @@ async function loadDayTypes() {
     DAY_TYPES_CACHE.map(dt => `<option value="${dt.id}">${escapeHtml(dt.name)}</option>`).join('');
 
   if (!DAY_TYPES_CACHE.length) {
-    tbody.innerHTML = '<tr><td colspan="2" style="color:var(--text-muted);">Пусто</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted);">Пусто</td></tr>';
     return;
   }
   tbody.innerHTML = DAY_TYPES_CACHE.map(dt => `
-    <tr><td>${escapeHtml(dt.name)}</td><td>${dt.weekdays.map(w => WEEKDAY_LABELS[w]).join(', ')}</td></tr>
+    <tr>
+      <td>${escapeHtml(dt.name)}</td>
+      <td>${dt.weekdays.map(w => WEEKDAY_LABELS[w]).join(', ')}</td>
+      <td><span style="display:inline-block; width:16px; height:16px; border-radius:4px; vertical-align:middle; border:1px solid var(--border); background:${escapeHtml(dt.color || '#64748b')};"></span></td>
+      <td>
+        <div class="row-actions">
+          <button class="btn btn-ghost" data-edit-daytype="${dt.id}" title="Редактировать" style="padding:4px 8px;">✎</button>
+          <button class="btn btn-ghost" data-delete-daytype="${dt.id}" title="Удалить" style="padding:4px 8px;">🗑</button>
+        </div>
+      </td>
+    </tr>
   `).join('');
+
+  tbody.querySelectorAll('[data-edit-daytype]').forEach(btn => {
+    btn.addEventListener('click', () => openDayTypeModal(btn.dataset.editDaytype));
+  });
+  tbody.querySelectorAll('[data-delete-daytype]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Удалить тип дня?')) return;
+      const res = await adminFetch(`/api/day-types/${btn.dataset.deleteDaytype}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        alert(data?.error || 'Не удалось удалить тип дня — возможно, на него ссылаются правила цен или календарь.');
+        return;
+      }
+      loadDayTypes();
+    });
+  });
+}
+
+function openDayTypeModal(id) {
+  dayTypeEditingId = id || null;
+  const dt = id ? DAY_TYPES_CACHE.find(d => d.id === id) : null;
+  document.getElementById('dtModalTitle').textContent = dt ? 'Изменить группу' : 'Добавить группу';
+  document.getElementById('dtModalName').value = dt ? dt.name : '';
+  document.getElementById('dtModalColor').value = dt?.color || '#f8f00d';
+  document.querySelectorAll('.dt-modal-weekday').forEach(cb => {
+    cb.checked = !!dt && dt.weekdays.includes(Number(cb.value));
+  });
+  document.getElementById('dtModalBackdrop').style.display = 'flex';
 }
 
 function initDayTypesForm() {
-  document.getElementById('dtAddSubmit').addEventListener('click', async () => {
-    const name = document.getElementById('dtNewName').value.trim();
-    const weekdays = Array.from(document.querySelectorAll('.dt-weekday:checked')).map(cb => Number(cb.value));
+  const backdrop = document.getElementById('dtModalBackdrop');
+  const closeModal = () => { backdrop.style.display = 'none'; };
+
+  document.getElementById('dtAddBtn').addEventListener('click', () => openDayTypeModal(null));
+  document.getElementById('dtModalClose').addEventListener('click', closeModal);
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
+
+  document.getElementById('dtModalSave').addEventListener('click', async () => {
+    const name = document.getElementById('dtModalName').value.trim();
+    const color = document.getElementById('dtModalColor').value;
+    const weekdays = Array.from(document.querySelectorAll('.dt-modal-weekday:checked')).map(cb => Number(cb.value));
     if (!name || !weekdays.length) return;
-    await adminFetch('/api/day-types', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clubId: CLUB_ID, name, weekdays }),
-    });
-    document.getElementById('dtNewName').value = '';
-    document.querySelectorAll('.dt-weekday').forEach(cb => cb.checked = false);
+
+    const body = { name, color, weekdays };
+    const res = dayTypeEditingId
+      ? await adminFetch(`/api/day-types/${dayTypeEditingId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        })
+      : await adminFetch('/api/day-types', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clubId: CLUB_ID, ...body }),
+        });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      alert(data?.error || 'Не удалось сохранить тип дня.');
+      return;
+    }
+    closeModal();
     loadDayTypes();
   });
 }

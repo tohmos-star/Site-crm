@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { Type } from "@sinclair/typebox";
 import {
   DayTypeBody,
+  DayTypeParams,
   HolidayOverrideBody,
   IdParams,
   PurchaseSubscriptionBody,
@@ -24,6 +25,18 @@ const tariffRoutes: FastifyPluginAsync = async (fastify) => {
     handler: async (request, reply) => {
       reply.code(201);
       return service.createDayType(request.body as never);
+    },
+  });
+  fastify.patch("/day-types/:id", {
+    schema: { params: DayTypeParams, body: Type.Partial(DayTypeBody) },
+    handler: async (request) =>
+      service.updateDayType((request.params as { id: string }).id, request.body as never),
+  });
+  fastify.delete("/day-types/:id", {
+    schema: { params: DayTypeParams },
+    handler: async (request, reply) => {
+      await service.deleteDayType((request.params as { id: string }).id);
+      reply.code(204);
     },
   });
 
