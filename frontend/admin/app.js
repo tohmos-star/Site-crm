@@ -70,12 +70,18 @@ function initTabs() {
   });
 
   // Подвкладки внутри "Тарифы" (Типы дней / Группы тарифов / Базовый тариф / Пакеты).
+  // trPanel ("Правила цен") общий для "Группы тарифов" и "Пакеты" и физически
+  // вынесен за пределы subtab-panel — при уходе на другую подвкладку прячем
+  // его и сбрасываем выбор пакета, чтобы не оставалось "прилипшего" состояния.
   document.querySelectorAll('.subtab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.subtab-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('subtab-' + btn.dataset.subtab).classList.add('active');
+      document.getElementById('trPanel').style.display = 'none';
+      const pkgSelect = document.getElementById('pkgTariffSelect');
+      if (pkgSelect) pkgSelect.value = '';
     });
   });
 }
@@ -519,6 +525,7 @@ function populateZoneSelects() {
   document.getElementById('dZoneFilter').innerHTML = '<option value="">Все зоны</option>' + opts;
   document.getElementById('dNewZone').innerHTML = opts;
   document.getElementById('trNewZone').innerHTML = opts;
+  document.getElementById('trEditZone').innerHTML = opts;
 }
 
 async function loadDevices() {
@@ -813,8 +820,9 @@ async function loadDayTypes() {
   const tbody = document.getElementById('dtTableBody');
   const res = await adminFetch(`/api/day-types?clubId=${CLUB_ID}`);
   DAY_TYPES_CACHE = await res.json();
-  document.getElementById('trNewDayType').innerHTML =
-    DAY_TYPES_CACHE.map(dt => `<option value="${dt.id}">${escapeHtml(dt.name)}</option>`).join('');
+  const dayTypeOpts = DAY_TYPES_CACHE.map(dt => `<option value="${dt.id}">${escapeHtml(dt.name)}</option>`).join('');
+  document.getElementById('trNewDayType').innerHTML = dayTypeOpts;
+  document.getElementById('trEditDayType').innerHTML = dayTypeOpts;
 
   if (!DAY_TYPES_CACHE.length) {
     tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted);">Пусто</td></tr>';
@@ -937,6 +945,18 @@ async function loadTariffs() {
   TARIFFS_CACHE = await res.json();
   renderTariffsTable();
   renderBaseTariffPanel();
+  renderPackagePicker();
+}
+
+// "Пакеты" — выпадающий список PACKAGE-тарифов (заведённых во "Группы
+// тарифов"); выбор открывает общую панель "Правила цен" для него.
+function renderPackagePicker() {
+  const select = document.getElementById('pkgTariffSelect');
+  const selected = select.value;
+  const packages = TARIFFS_CACHE.filter(t => t.type === 'PACKAGE');
+  select.innerHTML = '<option value="">— выберите пакет —</option>' +
+    packages.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+  if (packages.some(t => t.id === selected)) select.value = selected;
 }
 
 // "Базовый тариф" — отдельная подвкладка с фокусом на его ключевой настройке
@@ -1052,6 +1072,15 @@ function initTariffsForm() {
   typeSelect.addEventListener('change', updateNewTariffFieldVisibility);
   updateNewTariffFieldVisibility();
 
+  document.getElementById('pkgTariffSelect').addEventListener('change', (e) => {
+    if (!e.target.value) {
+      document.getElementById('trPanel').style.display = 'none';
+      return;
+    }
+    const t = TARIFFS_CACHE.find(x => x.id === e.target.value);
+    openRulesPanel(t.id, t.name);
+  });
+
   document.getElementById('tAddSubmit').addEventListener('click', async () => {
     const groupId = document.getElementById('tNewGroup').value;
     const uiType = typeSelect.value; // BASE | FIXED_DURATION | FIXED_END | SUBSCRIPTION
@@ -1139,6 +1168,9 @@ function initTariffsForm() {
   });
 }
 
+let RULES_CACHE = [];
+let ruleEditingId = null;
+
 function openRulesPanel(tariffId, tariffName) {
   currentRulesTariffId = tariffId;
   document.getElementById('trPanel').style.display = '';
@@ -1146,19 +1178,30 @@ function openRulesPanel(tariffId, tariffName) {
   loadTariffRules();
 }
 
+// Необязательное время — пусто, если поле не заполнено (не "00:00").
+function hhmmToMinutesOrNull(hhmm) {
+  return hhmm ? hhmmToMinutes(hhmm) : null;
+}
+function minutesToHHMMOrEmpty(min) {
+  return min === null || min === undefined ? '' : minutesToHHMM(min);
+}
+
 async function loadTariffRules() {
   const tbody = document.getElementById('trTableBody');
-  tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);">Загрузка…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted);">Загрузка…</td></tr>';
   const res = await adminFetch(`/api/tariff-rules?tariffId=${currentRulesTariffId}`);
-  const rules = await res.json();
+  RULES_CACHE = await res.json();
 
-  if (!rules.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);">Пусто — добавьте правило ниже</td></tr>';
+  if (!RULES_CACHE.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted);">Пусто — добавьте правило ниже</td></tr>';
     return;
   }
-  tbody.innerHTML = rules.map(r => {
+  tbody.innerHTML = RULES_CACHE.map(r => {
     const zone = ZONES_CACHE.find(z => z.id === r.zoneId);
     const dayType = DAY_TYPES_CACHE.find(dt => dt.id === r.dayTypeId);
+    const display = r.displayStartMinute != null && r.displayEndMinute != null
+      ? `${minutesToHHMM(r.displayStartMinute)}–${minutesToHHMM(r.displayEndMinute)}`
+      : '—';
     return `
       <tr>
         <td>${escapeHtml(zone?.nameRu || '—')}</td>
@@ -1167,17 +1210,29 @@ async function loadTariffRules() {
         <td>${minutesToHHMM(r.endMinute)}</td>
         <td>${Number(r.pricePerMinute).toFixed(2)}</td>
         <td>${Math.round(Number(r.pricePerMinute) * 60)}</td>
-        <td><button class="btn btn-ghost" data-delete-rule="${r.id}">Удалить</button></td>
+        <td>${display}</td>
+        <td><button class="btn btn-ghost" data-edit-rule="${r.id}">✎</button></td>
       </tr>
     `;
   }).join('');
 
-  tbody.querySelectorAll('[data-delete-rule]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      await adminFetch(`/api/tariff-rules/${btn.dataset.deleteRule}`, { method: 'DELETE' });
-      loadTariffRules();
-    });
+  tbody.querySelectorAll('[data-edit-rule]').forEach(btn => {
+    btn.addEventListener('click', () => openRuleEditModal(btn.dataset.editRule));
   });
+}
+
+function openRuleEditModal(id) {
+  const r = RULES_CACHE.find(x => x.id === id);
+  if (!r) return;
+  ruleEditingId = id;
+  document.getElementById('trEditZone').value = r.zoneId;
+  document.getElementById('trEditDayType').value = r.dayTypeId;
+  document.getElementById('trEditStart').value = minutesToHHMM(r.startMinute);
+  document.getElementById('trEditEnd').value = minutesToHHMM(r.endMinute);
+  document.getElementById('trEditPrice').value = Number(r.pricePerMinute);
+  document.getElementById('trEditDisplayStart').value = minutesToHHMMOrEmpty(r.displayStartMinute);
+  document.getElementById('trEditDisplayEnd').value = minutesToHHMMOrEmpty(r.displayEndMinute);
+  document.getElementById('trEditModalBackdrop').style.display = 'flex';
 }
 
 function initTariffRulesForm() {
@@ -1188,12 +1243,64 @@ function initTariffRulesForm() {
     const startMinute = hhmmToMinutes(document.getElementById('trNewStart').value);
     const endMinute = hhmmToMinutes(document.getElementById('trNewEnd').value);
     const pricePerMinute = Number(document.getElementById('trNewPrice').value);
+    const displayStartMinute = hhmmToMinutesOrNull(document.getElementById('trNewDisplayStart').value);
+    const displayEndMinute = hhmmToMinutesOrNull(document.getElementById('trNewDisplayEnd').value);
     if (!zoneId || !dayTypeId || !pricePerMinute) return;
-    await adminFetch('/api/tariff-rules', {
+    const res = await adminFetch('/api/tariff-rules', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tariffId: currentRulesTariffId, zoneId, dayTypeId, startMinute, endMinute, pricePerMinute }),
+      body: JSON.stringify({
+        tariffId: currentRulesTariffId, zoneId, dayTypeId, startMinute, endMinute, pricePerMinute,
+        displayStartMinute: displayStartMinute ?? undefined,
+        displayEndMinute: displayEndMinute ?? undefined,
+      }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      alert(data?.error || 'Не удалось добавить правило.');
+      return;
+    }
     document.getElementById('trNewPrice').value = '';
+    document.getElementById('trNewDisplayStart').value = '';
+    document.getElementById('trNewDisplayEnd').value = '';
+    loadTariffRules();
+  });
+
+  const ruleEditBackdrop = document.getElementById('trEditModalBackdrop');
+  document.getElementById('trEditModalClose').addEventListener('click', () => { ruleEditBackdrop.style.display = 'none'; });
+  ruleEditBackdrop.addEventListener('click', (e) => { if (e.target === ruleEditBackdrop) ruleEditBackdrop.style.display = 'none'; });
+
+  document.getElementById('trEditModalSave').addEventListener('click', async () => {
+    const body = {
+      zoneId: document.getElementById('trEditZone').value,
+      dayTypeId: document.getElementById('trEditDayType').value,
+      startMinute: hhmmToMinutes(document.getElementById('trEditStart').value),
+      endMinute: hhmmToMinutes(document.getElementById('trEditEnd').value),
+      pricePerMinute: Number(document.getElementById('trEditPrice').value),
+      displayStartMinute: hhmmToMinutesOrNull(document.getElementById('trEditDisplayStart').value),
+      displayEndMinute: hhmmToMinutesOrNull(document.getElementById('trEditDisplayEnd').value),
+    };
+    const res = await adminFetch(`/api/tariff-rules/${ruleEditingId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      alert(data?.error || 'Не удалось сохранить правило.');
+      return;
+    }
+    ruleEditBackdrop.style.display = 'none';
+    loadTariffRules();
+  });
+
+  document.getElementById('trEditModalDelete').addEventListener('click', async () => {
+    if (!confirm('Удалить это правило цены?')) return;
+    const res = await adminFetch(`/api/tariff-rules/${ruleEditingId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      alert(data?.error || 'Не удалось удалить правило.');
+      return;
+    }
+    ruleEditBackdrop.style.display = 'none';
     loadTariffRules();
   });
 }

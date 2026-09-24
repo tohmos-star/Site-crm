@@ -194,15 +194,24 @@ export class TariffService {
   }
 
   createTariffRule(body: TariffRuleBody) {
-    if (body.endMinute <= body.startMinute) {
-      throw new DomainError(
-        "INVALID_TARIFF_RULE",
-        "endMinute must be greater than startMinute — split rules crossing midnight into two",
-        400,
-      );
-    }
+    this.assertTariffRuleShape(body);
     return this.prisma.tariffRule.create({
       data: { ...body, pricePerMinute: new Decimal(body.pricePerMinute) },
+    });
+  }
+
+  async updateTariffRule(id: string, body: Partial<TariffRuleBody>) {
+    const existing = await this.prisma.tariffRule.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundError("TariffRule", id);
+
+    this.assertTariffRuleShape({ ...existing, ...body });
+
+    return this.prisma.tariffRule.update({
+      where: { id },
+      data: {
+        ...body,
+        pricePerMinute: body.pricePerMinute !== undefined ? new Decimal(body.pricePerMinute) : undefined,
+      },
     });
   }
 
@@ -210,6 +219,32 @@ export class TariffService {
     const rule = await this.prisma.tariffRule.findUnique({ where: { id } });
     if (!rule) throw new NotFoundError("TariffRule", id);
     await this.prisma.tariffRule.delete({ where: { id } });
+  }
+
+  private assertTariffRuleShape(body: {
+    startMinute: number;
+    endMinute: number;
+    displayStartMinute?: number | null;
+    displayEndMinute?: number | null;
+  }) {
+    if (body.endMinute <= body.startMinute) {
+      throw new DomainError(
+        "INVALID_TARIFF_RULE",
+        "endMinute must be greater than startMinute — split rules crossing midnight into two",
+        400,
+      );
+    }
+    if (
+      body.displayStartMinute != null &&
+      body.displayEndMinute != null &&
+      body.displayEndMinute <= body.displayStartMinute
+    ) {
+      throw new DomainError(
+        "INVALID_TARIFF_RULE",
+        "displayEndMinute must be greater than displayStartMinute",
+        400,
+      );
+    }
   }
 
   // --- Pricing ---------------------------------------------------------------

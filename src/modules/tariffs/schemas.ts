@@ -65,8 +65,11 @@ export const TariffRuleBody = Type.Object({
   startMinute: Type.Integer({ minimum: 0, maximum: 1439 }),
   endMinute: Type.Integer({ minimum: 1, maximum: 1440 }),
   pricePerMinute: Type.Number({ minimum: 0 }),
-  displayStartMinute: Type.Optional(Type.Integer({ minimum: 0, maximum: 1439 })),
-  displayEndMinute: Type.Optional(Type.Integer({ minimum: 1, maximum: 1440 })),
+  // Null первым в union — иначе Ajv (coerceTypes: true) молча превращает
+  // null в 0 при валидации числа, и снятие окна отображения на PATCH не
+  // сработает (см. тот же фикс в zones/loyalty схемах).
+  displayStartMinute: Type.Optional(Type.Union([Type.Null(), Type.Integer({ minimum: 0, maximum: 1439 })])),
+  displayEndMinute: Type.Optional(Type.Union([Type.Null(), Type.Integer({ minimum: 1, maximum: 1440 })])),
 });
 export type TariffRuleBody = Static<typeof TariffRuleBody>;
 

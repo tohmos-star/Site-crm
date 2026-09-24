@@ -314,22 +314,6 @@
             <button class="btn btn-primary" id="tEditModalSave" style="width:100%; justify-content:center;">Сохранить</button>
           </div>
         </div>
-
-        <div id="trPanel" style="display:none;">
-          <h3 style="font-size:14px; margin:0 0 10px;">Правила цен — <span id="trTariffName"></span></h3>
-          <div class="filter-row" style="align-items:flex-end;">
-            <div class="field" style="margin:0;"><label>Зона</label><select id="trNewZone" style="width:140px;"></select></div>
-            <div class="field" style="margin:0;"><label>Тип дня</label><select id="trNewDayType" style="width:120px;"></select></div>
-            <div class="field" style="margin:0;"><label>С</label><input type="time" id="trNewStart" value="00:00" style="width:100px;"></div>
-            <div class="field" style="margin:0;"><label>По</label><input type="time" id="trNewEnd" value="23:59" style="width:100px;"></div>
-            <div class="field" style="margin:0;"><label>Цена/мин, ₽</label><input type="number" step="0.01" id="trNewPrice" placeholder="4.17" style="width:100px;"></div>
-            <button class="btn btn-primary" id="trAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить правило</button>
-          </div>
-          <table class="admin-table">
-            <thead><tr><th>Зона</th><th>Тип дня</th><th>С</th><th>По</th><th>Цена/мин</th><th>≈ Цена/час</th><th>Действия</th></tr></thead>
-            <tbody id="trTableBody"></tbody>
-          </table>
-        </div>
       </div>
 
       <!-- Базовый тариф: список BASE-тарифов с фокусом на минимальном
@@ -337,9 +321,56 @@
       <div class="subtab-panel" id="subtab-base">
         <p style="color:var(--text-muted); font-size:13px;">Загрузка…</p>
       </div>
-      <!-- Пакеты: ждёт скриншота нужного экрана — см. чат. -->
+
+      <!-- Пакеты: выбор PACKAGE-тарифа (заведён во "Группы тарифов") открывает
+           общую панель "Правила цен" (см. trPanel ниже) — те же зона/тип
+           дня/цена, что и у базового тарифа, плюс окно отображения/продажи. -->
       <div class="subtab-panel" id="subtab-packages">
-        <p style="color:var(--text-muted); font-size:13px;">Настройка пакетов появится здесь — пришлите скриншот нужного экрана.</p>
+        <div class="field" style="max-width:280px;">
+          <label>Пакет</label>
+          <select id="pkgTariffSelect"><option value="">— выберите пакет —</option></select>
+        </div>
+      </div>
+
+      <!-- Правила цен — общая панель для "Группы тарифов" (кнопка в таблице)
+           и "Пакеты" (выбор из списка выше); вынесена сюда, чтобы быть
+           доступной из любой подвкладки. -->
+      <div id="trPanel" style="display:none;">
+        <h3 style="font-size:14px; margin:0 0 10px;">Правила цен — <span id="trTariffName"></span></h3>
+        <div class="filter-row" style="align-items:flex-end;">
+          <div class="field" style="margin:0;"><label>Зона</label><select id="trNewZone" style="width:140px;"></select></div>
+          <div class="field" style="margin:0;"><label>Тип дня</label><select id="trNewDayType" style="width:120px;"></select></div>
+          <div class="field" style="margin:0;"><label>С</label><input type="time" id="trNewStart" value="00:00" style="width:100px;"></div>
+          <div class="field" style="margin:0;"><label>По</label><input type="time" id="trNewEnd" value="23:59" style="width:100px;"></div>
+          <div class="field" style="margin:0;"><label>Цена/мин, ₽</label><input type="number" step="0.01" id="trNewPrice" placeholder="4.17" style="width:100px;"></div>
+          <div class="field" style="margin:0;"><label>Отображение с</label><input type="time" id="trNewDisplayStart" style="width:100px;"></div>
+          <div class="field" style="margin:0;"><label>Отображение по</label><input type="time" id="trNewDisplayEnd" style="width:100px;"></div>
+          <button class="btn btn-primary" id="trAddSubmit" style="padding:8px 14px; font-size:13px;">Добавить правило</button>
+        </div>
+        <table class="admin-table">
+          <thead><tr><th>Зона</th><th>Тип дня</th><th>С</th><th>По</th><th>Цена/мин</th><th>≈ Цена/час</th><th>Отображение</th><th>Действия</th></tr></thead>
+          <tbody id="trTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="modal-backdrop" id="trEditModalBackdrop" style="display:none;">
+        <div class="modal-box">
+          <div class="modal-head">
+            <h3>Изменить правило</h3>
+            <button type="button" class="modal-close" id="trEditModalClose">&times;</button>
+          </div>
+          <div class="field"><label>Зона</label><select id="trEditZone"></select></div>
+          <div class="field"><label>Тип дня</label><select id="trEditDayType"></select></div>
+          <div class="field"><label>С</label><input type="time" id="trEditStart"></div>
+          <div class="field"><label>По</label><input type="time" id="trEditEnd"></div>
+          <div class="field"><label>Цена/мин, ₽</label><input type="number" step="0.01" id="trEditPrice"></div>
+          <div class="field"><label>Отображение с (необязательно)</label><input type="time" id="trEditDisplayStart"></div>
+          <div class="field"><label>Отображение по (необязательно)</label><input type="time" id="trEditDisplayEnd"></div>
+          <div class="row-actions" style="margin-top:8px;">
+            <button class="btn btn-primary" id="trEditModalSave" style="flex:1; justify-content:center;">Сохранить</button>
+            <button class="btn btn-ghost" id="trEditModalDelete" style="color:var(--accent);">Удалить</button>
+          </div>
+        </div>
       </div>
     </section>
 

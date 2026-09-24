@@ -99,6 +99,11 @@ const tariffRoutes: FastifyPluginAsync = async (fastify) => {
       return service.createTariffRule(request.body as never);
     },
   });
+  fastify.patch("/tariff-rules/:id", {
+    schema: { params: IdParams, body: Type.Partial(TariffRuleBody) },
+    handler: async (request) =>
+      service.updateTariffRule((request.params as { id: string }).id, request.body as never),
+  });
   fastify.delete("/tariff-rules/:id", {
     schema: { params: IdParams },
     handler: async (request, reply) => {
