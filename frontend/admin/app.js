@@ -231,6 +231,47 @@ function initAccessForm() {
 }
 
 // ---------------------------------------------------------------------
+// Тарификация — базовый почасовой биллинг (см. ARCHIVED_SECTIONS.md):
+// один флэт-рейт на клуб вместо тарифов/зон/типов дней.
+// ---------------------------------------------------------------------
+
+async function loadBillingSettings() {
+  try {
+    const res = await adminFetch('/api/admin/billing-settings');
+    const data = await res.json();
+    document.getElementById('billPricePerHour').value = data.pricePerHourRub;
+    document.getElementById('billMinMinutes').value = data.minChargedMinutes;
+  } catch { /* handled by adminFetch redirect */ }
+}
+
+async function saveBillingSettings() {
+  const statusEl = document.getElementById('billingStatus');
+  try {
+    const res = await adminFetch('/api/admin/billing-settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pricePerHourRub: Number(document.getElementById('billPricePerHour').value) || 0,
+        minChargedMinutes: Number(document.getElementById('billMinMinutes').value) || 0,
+      }),
+    });
+    if (!res.ok) throw new Error();
+    statusEl.textContent = 'Сохранено.';
+    statusEl.className = 'status-msg show ok';
+  } catch {
+    statusEl.textContent = 'Не удалось сохранить.';
+    statusEl.className = 'status-msg show err';
+  }
+}
+
+function initBillingForm() {
+  document.getElementById('billingForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    saveBillingSettings();
+  });
+}
+
+// ---------------------------------------------------------------------
 // 3. Гости
 // ---------------------------------------------------------------------
 
@@ -672,6 +713,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initAccessForm();
   initGuestsTab();
   initDevicesTab();
+  initBillingForm();
 
   document.getElementById('vStatusFilter').addEventListener('change', loadRegistrations);
   document.getElementById('vRefresh').addEventListener('click', loadRegistrations);
@@ -687,6 +729,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   loadRegistrations();
   loadAccessCredential();
+  loadBillingSettings();
   loadGuests();
 
   try {

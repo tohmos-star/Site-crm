@@ -3,6 +3,7 @@ import { Type } from "@sinclair/typebox";
 import {
   AccessCredentialBody,
   AdminLoginBody,
+  BillingSettingsBody,
   LoginBody,
   RegistrationsQuery,
   ReviewRegistrationBody,
@@ -205,6 +206,40 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       return {
         intercomUrl: updated.intercomUrl,
         doorCodeMain: updated.doorCodeMain,
+      };
+    },
+  });
+
+  // Базовый почасовой биллинг — один флэт-рейт на клуб вместо тарифов/зон/
+  // типов дней (см. frontend/ARCHIVED_SECTIONS.md). Используется в
+  // TariffService.quote() (src/modules/tariffs/service.ts).
+  fastify.get("/admin/billing-settings", {
+    preHandler: fastify.authenticateAdmin,
+    handler: async () => {
+      const club = await service.getSingleClub();
+      return {
+        pricePerHourRub: Number(club.pricePerHourRub),
+        minChargedMinutes: club.minChargedMinutes,
+      };
+    },
+  });
+
+  fastify.put("/admin/billing-settings", {
+    preHandler: fastify.authenticateAdmin,
+    schema: { body: BillingSettingsBody },
+    handler: async (request) => {
+      const body = request.body as { pricePerHourRub: number; minChargedMinutes: number };
+      const club = await service.getSingleClub();
+      const updated = await fastify.prisma.club.update({
+        where: { id: club.id },
+        data: {
+          pricePerHourRub: body.pricePerHourRub,
+          minChargedMinutes: body.minChargedMinutes,
+        },
+      });
+      return {
+        pricePerHourRub: Number(updated.pricePerHourRub),
+        minChargedMinutes: updated.minChargedMinutes,
       };
     },
   });

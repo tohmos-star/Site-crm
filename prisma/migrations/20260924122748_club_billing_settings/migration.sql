@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Club" ADD COLUMN     "minChargedMinutes" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "pricePerHourRub" DECIMAL(10,2) NOT NULL DEFAULT 0;

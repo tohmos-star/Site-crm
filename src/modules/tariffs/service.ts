@@ -2,11 +2,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { DomainError, NotFoundError } from "../../lib/errors.js";
 import { BalanceService } from "../balance/service.js";
-import {
-  computeFixedEndDurationMinutes,
-  computeIntervalPrice,
-  dateToIsoDay,
-} from "./pricing.js";
+import { computeFixedEndDurationMinutes } from "./pricing.js";
 import type {
   DayTypeBody,
   HolidayOverrideBody,
@@ -292,34 +288,28 @@ export class TariffService {
       );
     }
 
-    let paidMinutes: number;
+    let requestedMinutes: number;
     if (tariff.type === "BASE") {
       if (!params.durationMinutes) {
         throw new DomainError("MISSING_DURATION", "BASE tariff requires durationMinutes", 400);
       }
-      paidMinutes = params.durationMinutes;
+      requestedMinutes = params.durationMinutes;
     } else if (tariff.packageMode === "FIXED_DURATION") {
-      paidMinutes = tariff.packageDurationMin!;
+      requestedMinutes = tariff.packageDurationMin!;
     } else {
-      paidMinutes = computeFixedEndDurationMinutes(params.startAt, tariff.packageFixedEndMin!);
+      requestedMinutes = computeFixedEndDurationMinutes(params.startAt, tariff.packageFixedEndMin!);
     }
 
     const zone = await this.prisma.zone.findUniqueOrThrow({ where: { id: params.zoneId } });
-    const dayTypes = await this.prisma.dayType.findMany({ where: { clubId: zone.clubId } });
-    const holidays = await this.prisma.holidayOverride.findMany({ where: { clubId: zone.clubId } });
+    const club = await this.prisma.club.findUniqueOrThrow({ where: { id: zone.clubId } });
 
-    const price = await computeIntervalPrice(
-      params.startAt,
-      paidMinutes,
-      dayTypes,
-      holidays.map((h) => ({ dateIso: dateToIsoDay(h.date), dayTypeId: h.dayTypeId })),
-      {
-        getRulesForDayType: (dayTypeId) =>
-          this.prisma.tariffRule.findMany({
-            where: { tariffId: tariff.id, zoneId: params.zoneId, dayTypeId },
-          }),
-      },
-    );
+    // Базовый почасовой биллинг (Club.pricePerHourRub/minChargedMinutes) —
+    // плоская цена на весь клуб вместо сетки зона×тип дня×время (та сетка,
+    // TariffRule/DayType, больше не настраивается из админки, см.
+    // frontend/ARCHIVED_SECTIONS.md). minChargedMinutes — это ещё и
+    // минимальная длительность самой сессии, не только минимальная оплата.
+    const paidMinutes = Math.max(requestedMinutes, club.minChargedMinutes);
+    const price = new Decimal(club.pricePerHourRub).mul(paidMinutes).div(60);
 
     return { paidMinutes, price };
   }

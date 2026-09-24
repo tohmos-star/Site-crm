@@ -30,3 +30,9 @@ export const AccessCredentialBody = Type.Object({
   doorCodeMain: Type.Array(Type.String(), { maxItems: 10 }),
 });
 export type AccessCredentialBody = Static<typeof AccessCredentialBody>;
+
+export const BillingSettingsBody = Type.Object({
+  pricePerHourRub: Type.Number({ minimum: 0 }),
+  minChargedMinutes: Type.Integer({ minimum: 0 }),
+});
+export type BillingSettingsBody = Static<typeof BillingSettingsBody>;

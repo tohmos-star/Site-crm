@@ -30,6 +30,14 @@ model Club {
   // /admin/access-credential); гостю (GET /entry-access) отдаётся первый.
   intercomUrl  String?
   doorCodeMain String[] @default([])
+
+  // Базовый почасовой биллинг (см. frontend/ARCHIVED_SECTIONS.md — тарифы/
+  // зоны/типы дней убраны из админки как лишняя сложность): один флэт-рейт
+  // на клуб + минимальное время, которое спишется всегда, даже если сессия
+  // короче. См. TariffService.quote() в src/modules/tariffs/service.ts.
+  pricePerHourRub   Decimal @default(0) @db.Decimal(10, 2)
+  minChargedMinutes Int     @default(0)
+
   createdAt    DateTime @default(now())
 
   zones          Zone[]
