@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -22,7 +23,18 @@ public class ApiClient
     // сервере) — см. pc-agent/README.md.
     private const string BaseUrl = "http://92.242.60.149:3000";
 
-    private readonly HttpClient _http = new() { BaseAddress = new Uri(BaseUrl) };
+    // Клубные сети нередко сидят за прокси с NTLM/Kerberos-аутентификацией:
+    // браузер на том же ПК проходит его прозрачно (WinINet берёт креды
+    // текущего пользователя Windows), а голый HttpClient — нет, и запрос
+    // до нашего сервера падает уже на прокси ("Нет связи с сервером",
+    // хотя сервер и порт снаружи доступны). DefaultProxyCredentials чинит
+    // именно это: подставляет текущие Windows-креды для прокси, не трогая
+    // авторизацию к самому серверу (она идёт через Bearer-токен станции).
+    private readonly HttpClient _http = new(new HttpClientHandler
+    {
+        DefaultProxyCredentials = CredentialCache.DefaultCredentials,
+    })
+    { BaseAddress = new Uri(BaseUrl) };
 
     public async Task<TokenCheckResult> CheckDeviceTokenAsync(string deviceToken)
     {
