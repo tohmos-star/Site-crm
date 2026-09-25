@@ -10,6 +10,7 @@ public partial class App : Application
         base.OnStartup(e);
 
         AutostartManager.Enable();
+        ShortcutManager.EnsureShortcuts();
 
         var savedToken = DeviceTokenStore.Load();
         Window window = savedToken is null

@@ -10,4 +10,11 @@
     <RootNamespace>PcAgent</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Нужен для dynamic-вызовов COM (WScript.Shell) в ShortcutManager —
+         portable exe без инсталлятора сам создаёт себе ярлыки на рабочем
+         столе/в "Пуск" при первом запуске. -->
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+  </ItemGroup>
+
 </Project>
